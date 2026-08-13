@@ -28,6 +28,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Generate app icon
+        run: |
+          node scripts/make-icon.js
+          npm i png-to-ico@2 --no-save
+          node scripts/png-to-ico.js
+
       - name: Build and publish to GitHub Releases
         env:
           # electron-builder reads this to upload the release. Provided automatically.
