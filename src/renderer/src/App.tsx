@@ -1,0 +1,104 @@
+import { useEffect, useState, useCallback } from 'react'
+import {
+  Search,
+  History as HistoryIcon,
+  Star,
+  GitCompare,
+  Settings as SettingsIcon,
+  Shield,
+  Moon,
+  Sun
+} from 'lucide-react'
+import { ToastProvider } from './components/ui'
+import Dashboard from './pages/Dashboard'
+import HistoryPage from './pages/History'
+import Compare from './pages/Compare'
+import Settings from './pages/Settings'
+import type { SettingsStatus } from './global'
+
+type View = 'dashboard' | 'history' | 'favorites' | 'compare' | 'settings'
+
+function useTheme(): [string, () => void] {
+  const [theme, setTheme] = useState<string>(() => localStorage.getItem('theme') || 'dark')
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('theme', theme)
+  }, [theme])
+  return [theme, () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))]
+}
+
+export default function App() {
+  const [view, setView] = useState<View>('dashboard')
+  const [pendingQuery, setPendingQuery] = useState<string | null>(null)
+  const [theme, toggleTheme] = useTheme()
+  const [status, setStatus] = useState<SettingsStatus | null>(null)
+
+  const refreshStatus = useCallback(async () => {
+    setStatus(await window.api.settings.status())
+  }, [])
+  useEffect(() => {
+    refreshStatus()
+  }, [refreshStatus])
+
+  const analyzeFromElsewhere = (q: string) => {
+    setPendingQuery(q)
+    setView('dashboard')
+  }
+
+  const nav = (v: View, icon: React.ReactNode, label: string) => (
+    <button className={`nav-item ${view === v ? 'active' : ''}`} onClick={() => setView(v)}>
+      {icon}
+      {label}
+    </button>
+  )
+
+  return (
+    <ToastProvider>
+      <div className="app">
+        <aside className="sidebar">
+          <div className="brand">
+            <div className="logo">
+              <Shield size={18} />
+            </div>
+            <div>
+              Player Intel
+              <div className="muted small" style={{ fontWeight: 400 }}>
+                Steam analyzer
+              </div>
+            </div>
+          </div>
+          {nav('dashboard', <Search size={17} />, 'Player Search')}
+          {nav('history', <HistoryIcon size={17} />, 'Recent Players')}
+          {nav('favorites', <Star size={17} />, 'Favorites')}
+          {nav('compare', <GitCompare size={17} />, 'Compare')}
+          <div className="nav-spacer" />
+          {!status?.steamKeySet && (
+            <button className="nav-item" style={{ color: 'var(--warn)' }} onClick={() => setView('settings')}>
+              <SettingsIcon size={17} /> Add Steam key
+            </button>
+          )}
+          {nav('settings', <SettingsIcon size={17} />, 'Settings')}
+          <button className="nav-item" onClick={toggleTheme}>
+            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          </button>
+        </aside>
+
+        <main className="main">
+          {view === 'dashboard' && (
+            <Dashboard
+              status={status}
+              pendingQuery={pendingQuery}
+              clearPending={() => setPendingQuery(null)}
+              goSettings={() => setView('settings')}
+            />
+          )}
+          {view === 'history' && <HistoryPage onAnalyze={analyzeFromElsewhere} favoritesOnly={false} />}
+          {view === 'favorites' && <HistoryPage onAnalyze={analyzeFromElsewhere} favoritesOnly={true} />}
+          {view === 'compare' && <Compare status={status} />}
+          {view === 'settings' && <Settings status={status} onChange={refreshStatus} />}
+        </main>
+      </div>
+    </ToastProvider>
+  )
+}

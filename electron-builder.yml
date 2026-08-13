@@ -1,0 +1,30 @@
+appId: com.steamplayerintel.app
+productName: Steam Player Intel
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+# better-sqlite3 must be unpacked so its native .node binary can load at runtime.
+asarUnpack:
+  - "**/node_modules/better-sqlite3/**"
+win:
+  target: [nsis]
+mac:
+  target: [dmg]
+  category: public.app-category.utilities
+linux:
+  target: [AppImage]
+  category: Utility
+# Auto-update feed (GitHub Releases). owner/repo are auto-detected from your
+# repository's git remote, so this works as soon as you publish the project to
+# GitHub — no username to fill in. The app checks this feed on launch and
+# installs updates on the next restart.
+#
+# To pin the target explicitly instead of auto-detecting, uncomment and set:
+#   owner: your-github-username
+#   repo: steam-player-intel
+publish:
+  provider: github
+  releaseType: release

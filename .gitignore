@@ -1,0 +1,14 @@
+node_modules/
+out/
+out-tsc/
+dist/
+release/
+*.log
+.DS_Store
+.env
+.env.local
+coverage/
+# Never commit real credentials or the local player database
+*.sqlite
+*.sqlite3
+credentials.enc

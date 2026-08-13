@@ -1,0 +1,38 @@
+name: Release
+
+# Runs when you either:
+#   - push a version tag like v0.1.1, or
+#   - click "Run workflow" on the Actions tab (workflow_dispatch).
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+# Lets the built-in GITHUB_TOKEN create the GitHub Release. No personal token needed.
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build and publish to GitHub Releases
+        env:
+          # electron-builder reads this to upload the release. Provided automatically.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run release
+
+# To also build macOS/Linux, add jobs on `macos-latest` / `ubuntu-latest`.
+# Note: macOS auto-update requires an Apple Developer account to sign & notarize.
