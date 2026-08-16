@@ -62,7 +62,7 @@ export default function PlayerReportView({
     else if (!res.canceled) toast('Export failed')
   }
 
-  const persona = id.personaState.value ?? 'offline'
+  const persona = id.personaState.value
   const vac = report.bans.numberOfVacBans.value
   const gameBans = report.bans.numberOfGameBans.value
 
@@ -81,12 +81,17 @@ export default function PlayerReportView({
               <div className="name">{id.displayName.value ?? 'Unknown player'}</div>
               <div className="meta">
                 <span>
-                  <span className="online-dot" style={{ background: PERSONA_COLOR[persona] }} />
-                  {personaStateLabel(
-                    ['offline', 'online', 'busy', 'away', 'snooze', 'looking-to-trade', 'looking-to-play'].indexOf(
-                      persona
-                    )
-                  )}
+                  <span
+                    className="online-dot"
+                    style={{ background: persona ? PERSONA_COLOR[persona] : 'var(--text-faint)' }}
+                  />
+                  {persona
+                    ? personaStateLabel(
+                        ['offline', 'online', 'busy', 'away', 'snooze', 'looking-to-trade', 'looking-to-play'].indexOf(
+                          persona
+                        )
+                      )
+                    : 'Unknown'}
                 </span>
                 <span className="mono">{id.steam64}</span>
                 <CopyButton text={id.steam64} />

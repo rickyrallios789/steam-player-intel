@@ -1,16 +1,19 @@
 /**
- * HTTP client with per-host rate limiting, exponential backoff, in-flight
- * de-duplication and TTL caching. (spec §27)
+ * HTTP client with per-host rate limiting (serialized, spaced queue), per-request
+ * timeouts, exponential backoff, in-flight de-duplication and TTL caching. (spec §27)
  *
  * Runs in the Electron MAIN process only. API keys are attached here and never
- * cross the IPC bridge to the renderer.
+ * cross the IPC bridge to the renderer. Keys/tokens are redacted from any error
+ * string so they can never leak into logs or the UI.
  */
 
 interface RateLimitOptions {
-  /** Minimum milliseconds between requests to the same host. */
+  /** Minimum milliseconds between the START of consecutive requests to a host. */
   minIntervalMs: number
-  /** Max retries on 429 / 5xx. */
+  /** Max retries on 429 / 5xx / network error / timeout. */
   maxRetries: number
+  /** Abort a single request after this many milliseconds. */
+  timeoutMs: number
 }
 
 interface RequestOptions {
@@ -19,7 +22,6 @@ interface RequestOptions {
   cacheTtlMs?: number
   /** Force a fresh fetch, ignoring cache. */
   bypassCache?: boolean
-  signal?: AbortSignal
 }
 
 interface CacheEntry {
@@ -29,9 +31,9 @@ interface CacheEntry {
 }
 
 const DEFAULT_LIMITS: Record<string, RateLimitOptions> = {
-  'api.steampowered.com': { minIntervalMs: 1100, maxRetries: 3 },
-  'api.battlemetrics.com': { minIntervalMs: 1100, maxRetries: 3 },
-  default: { minIntervalMs: 800, maxRetries: 2 }
+  'api.steampowered.com': { minIntervalMs: 350, maxRetries: 3, timeoutMs: 12_000 },
+  'api.battlemetrics.com': { minIntervalMs: 1_100, maxRetries: 3, timeoutMs: 12_000 },
+  default: { minIntervalMs: 500, maxRetries: 2, timeoutMs: 12_000 }
 }
 
 export interface HttpResult<T> {
@@ -45,8 +47,16 @@ export interface HttpResult<T> {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+/** Strip key=… / token=… from any string before it can reach a log or the UI. */
+function redact(s: string): string {
+  return s.replace(/([?&](?:key|token|apikey|access_token)=)[^&\s"']+/gi, '$1REDACTED')
+}
+
 export class HttpClient {
-  private lastRequestAt = new Map<string, number>()
+  /** Per-host tail of the scheduling chain (serializes slot acquisition). */
+  private tail = new Map<string, Promise<void>>()
+  /** Per-host earliest time the next request may start. */
+  private nextAt = new Map<string, number>()
   private inFlight = new Map<string, Promise<HttpResult<unknown>>>()
   private cache = new Map<string, CacheEntry>()
 
@@ -54,12 +64,25 @@ export class HttpClient {
     return DEFAULT_LIMITS[host] ?? DEFAULT_LIMITS.default
   }
 
-  private async throttle(host: string): Promise<void> {
-    const { minIntervalMs } = this.limitsFor(host)
-    const last = this.lastRequestAt.get(host) ?? 0
-    const wait = last + minIntervalMs - Date.now()
-    if (wait > 0) await sleep(wait)
-    this.lastRequestAt.set(host, Date.now())
+  /**
+   * Acquire a spaced send-slot for `host`. Requests are serialized through a
+   * per-host promise chain, so concurrent callers (e.g. the parallel Steam burst)
+   * are actually spaced by `minIntervalMs` instead of all firing at once. (audit F-1)
+   */
+  private acquireSlot(host: string): Promise<void> {
+    const minMs = this.limitsFor(host).minIntervalMs
+    const prev = this.tail.get(host) ?? Promise.resolve()
+    const run = prev.then(async () => {
+      const wait = (this.nextAt.get(host) ?? 0) - Date.now()
+      if (wait > 0) await sleep(wait)
+      this.nextAt.set(host, Date.now() + minMs)
+    })
+    // Keep the chain alive even if a link rejects (it never throws in practice).
+    this.tail.set(host, run.then(
+      () => undefined,
+      () => undefined
+    ))
+    return run
   }
 
   /** Clear cached entries (all, or those whose key includes `match`). */
@@ -75,7 +98,6 @@ export class HttpClient {
     const cacheKey = opts.cacheKey ?? url
     const ttl = opts.cacheTtlMs ?? 0
 
-    // Serve from cache.
     if (!opts.bypassCache && ttl > 0) {
       const hit = this.cache.get(cacheKey)
       if (hit && Date.now() - hit.at < ttl) {
@@ -89,7 +111,6 @@ export class HttpClient {
       }
     }
 
-    // De-duplicate identical concurrent requests.
     const existing = this.inFlight.get(cacheKey)
     if (existing) return existing as Promise<HttpResult<T>>
 
@@ -108,24 +129,25 @@ export class HttpClient {
     cacheKey: string,
     ttl: number
   ): Promise<HttpResult<T>> {
-    const { maxRetries } = this.limitsFor(opts.host)
+    const { maxRetries, timeoutMs } = this.limitsFor(opts.host)
     let attempt = 0
     let lastError = ''
 
     while (attempt <= maxRetries) {
-      await this.throttle(opts.host)
-      try {
-        const res = await fetch(url, {
-          signal: opts.signal,
-          headers: { Accept: 'application/json' }
-        })
+      await this.acquireSlot(opts.host)
 
-        // Retryable statuses.
+      const ac = new AbortController()
+      const timer = setTimeout(() => ac.abort(), timeoutMs)
+      try {
+        const res = await fetch(url, { signal: ac.signal, headers: { Accept: 'application/json' } })
+        clearTimeout(timer)
+
         if (res.status === 429 || res.status >= 500) {
           const retryAfter = Number(res.headers.get('retry-after'))
-          const backoff = Number.isFinite(retryAfter) && retryAfter > 0
-            ? retryAfter * 1000
-            : Math.min(15000, 2 ** attempt * 1000)
+          const backoff =
+            Number.isFinite(retryAfter) && retryAfter > 0
+              ? retryAfter * 1000
+              : Math.min(15_000, 2 ** attempt * 1000)
           lastError = `HTTP ${res.status}`
           attempt++
           if (attempt <= maxRetries) {
@@ -157,16 +179,22 @@ export class HttpClient {
           error: res.ok ? undefined : `HTTP ${res.status}`
         }
       } catch (err) {
-        lastError = err instanceof Error ? err.message : 'Network error'
+        clearTimeout(timer)
+        const aborted = err instanceof Error && err.name === 'AbortError'
+        lastError = aborted
+          ? `Timed out after ${timeoutMs} ms`
+          : err instanceof Error
+            ? redact(err.message)
+            : 'Network error'
         attempt++
         if (attempt <= maxRetries) {
-          await sleep(Math.min(15000, 2 ** attempt * 1000))
+          await sleep(Math.min(15_000, 2 ** attempt * 1000))
           continue
         }
       }
     }
 
-    return { ok: false, status: 0, data: null, fromCache: false, error: lastError || 'Request failed' }
+    return { ok: false, status: 0, data: null, fromCache: false, error: redact(lastError) || 'Request failed' }
   }
 }
 

@@ -6,6 +6,9 @@
  *  - The renderer has NO Node access and NO direct network access; it can only
  *    call the whitelisted IPC methods exposed by the preload bridge.
  *  - API keys live only in the main process credential store.
+ *
+ * A single-instance lock prevents a second launch from opening a duplicate
+ * window / second SQLite writer. (audit F-3)
  */
 import { app, BrowserWindow, shell } from 'electron'
 import { join, dirname } from 'node:path'
@@ -52,34 +55,46 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
-  // Auto-load a local, gitignored .env (main process only) so the Steam API key
-  // works without manual entry, while staying out of source control and the UI.
-  loadEnvFile([
-    join(app.getAppPath(), '.env'),
-    join(process.cwd(), '.env'),
-    join(dirname(app.getPath('exe')), '.env')
-  ])
-
-  const db = new AppDatabase(app.getPath('userData'))
-  const repos = new Repositories(db)
-  const credentials = new CredentialStore(app.getPath('userData'))
-
-  registerIpc({ repos, credentials, http: httpClient, openExternal: (u) => shell.openExternal(u) })
-
-  createWindow()
-
-  // Auto-update: only meaningful in the packaged app. Check shortly after launch.
-  initUpdater()
-  if (app.isPackaged) setTimeout(() => void checkForUpdates(), 4000)
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  // A second launch: focus the existing window instead of opening a duplicate.
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
   })
 
-  app.on('before-quit', () => db.close())
-})
+  app.whenReady().then(() => {
+    // Auto-load a local, gitignored .env (main process only) so the Steam API key
+    // works without manual entry, while staying out of source control and the UI.
+    loadEnvFile([
+      join(app.getAppPath(), '.env'),
+      join(process.cwd(), '.env'),
+      join(dirname(app.getPath('exe')), '.env')
+    ])
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+    const db = new AppDatabase(app.getPath('userData'))
+    const repos = new Repositories(db)
+    const credentials = new CredentialStore(app.getPath('userData'))
+
+    registerIpc({ repos, credentials, http: httpClient, openExternal: (u) => shell.openExternal(u) })
+
+    createWindow()
+
+    // Auto-update: only meaningful in the packaged app. Check shortly after launch.
+    initUpdater()
+    if (app.isPackaged) setTimeout(() => void checkForUpdates(), 4000)
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
+
+    app.on('before-quit', () => db.close())
+  })
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit()
+  })
+}

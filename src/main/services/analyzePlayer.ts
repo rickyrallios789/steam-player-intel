@@ -52,7 +52,7 @@ export interface AnalyzeOptions {
 const steam = new SteamProvider()
 const battlemetrics = new BattleMetricsProvider()
 
-function personaState(n: number | null): PersonaState {
+function personaState(n: number): PersonaState {
   const map: Record<number, PersonaState> = {
     0: 'offline',
     1: 'online',
@@ -62,7 +62,7 @@ function personaState(n: number | null): PersonaState {
     5: 'looking-to-trade',
     6: 'looking-to-play'
   }
-  return n != null && map[n] ? map[n] : 'offline'
+  return map[n] ?? 'offline'
 }
 
 function visibility(n: number | null): CommunityVisibility {
@@ -148,7 +148,10 @@ export async function analyzePlayer(
     countryCode: summary?.loccountrycode
       ? field(summary.loccountrycode, 'steam', 'verified')
       : missing('steam', isPrivate ? 'private' : 'unknown', 'Country is only shown when public.'),
-    personaState: field(personaState(summary?.personastate ?? null), 'steam', summary ? 'verified' : 'unknown'),
+    personaState:
+      summary?.personastate != null
+        ? field(personaState(summary.personastate), 'steam', 'verified')
+        : missing('steam', isPrivate ? 'private' : 'unknown'),
     communityVisibility: field(vis, 'steam', summary ? 'verified' : 'unknown'),
     profileConfigured: field((summary?.profilestate ?? 0) === 1, 'steam', summary ? 'verified' : 'unknown'),
     lastLogoff: summary?.lastlogoff

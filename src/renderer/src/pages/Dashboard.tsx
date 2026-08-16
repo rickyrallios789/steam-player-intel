@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, Loader2, AlertCircle } from 'lucide-react'
 import { detectSteamInput } from '@shared/steamid'
 import type { PlayerReport } from '@shared/types'
@@ -21,24 +21,29 @@ export default function Dashboard({
   const [loading, setLoading] = useState(false)
   const [report, setReport] = useState<PlayerReport | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const reqRef = useRef(0)
 
   const detection = useMemo(() => (query.trim() ? detectSteamInput(query) : null), [query])
 
   const run = async (raw: string, bypassCache = false) => {
     if (!raw.trim()) return
+    // Guard against out-of-order results: a newer search supersedes this one. (audit F-4)
+    const myReq = ++reqRef.current
     setLoading(true)
     setError(null)
     try {
       const res = await window.api.analyze(raw, { bypassCache })
+      if (myReq !== reqRef.current) return
       if (res.ok && res.report) setReport(res.report)
       else {
         setError(res.error ?? 'Analysis failed.')
         setReport(null)
       }
     } catch (e) {
+      if (myReq !== reqRef.current) return
       setError(e instanceof Error ? e.message : 'Unexpected error.')
     } finally {
-      setLoading(false)
+      if (myReq === reqRef.current) setLoading(false)
     }
   }
 
@@ -129,7 +134,7 @@ export default function Dashboard({
 
       {report && !loading && (
         <div style={{ marginTop: 24 }}>
-          <PlayerReportView report={report} onRefresh={() => run(query || report.identity.steam64, true)} />
+          <PlayerReportView report={report} onRefresh={() => run(report.identity.steam64, true)} />
         </div>
       )}
     </div>
