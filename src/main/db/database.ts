@@ -104,6 +104,13 @@ CREATE TABLE IF NOT EXISTS tags (
   tag     TEXT NOT NULL,
   PRIMARY KEY (steam64, tag)
 );
+
+CREATE TABLE IF NOT EXISTS http_cache (
+  cache_key  TEXT PRIMARY KEY,
+  status     INTEGER NOT NULL,
+  body       TEXT,
+  fetched_at INTEGER NOT NULL
+);
 `
 
 export class AppDatabase {

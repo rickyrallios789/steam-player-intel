@@ -216,8 +216,8 @@ export interface PlayerReport {
   }
   issues: ProviderIssue[]
   sourcesUsed: DataSource[]
-  /** Per-source freshness for the honest "live vs cached" indicator. (audit F-6) */
-  dataFreshness: Array<{ source: DataSource; label: string; fromCache: boolean; fetchedAt: string }>
+  /** Per-source freshness for the honest "live vs cached vs offline" indicator. (audit F-6, F-12) */
+  dataFreshness: Array<{ source: DataSource; label: string; fromCache: boolean; stale: boolean; fetchedAt: string }>
   generatedAt: string
   /** Raw, source-tagged payloads for the "Raw Data" tab. Never shown as if normalized. */
   raw: Record<string, unknown>

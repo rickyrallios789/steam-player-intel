@@ -14,6 +14,7 @@ import { app, BrowserWindow, shell } from 'electron'
 import { join, dirname } from 'node:path'
 import { AppDatabase } from './db/database'
 import { Repositories } from './db/repositories'
+import { SqliteCacheStore } from './db/cacheStore'
 import { CredentialStore } from './credentials'
 import { httpClient } from './core/httpClient'
 import { registerIpc } from './ipc'
@@ -78,6 +79,12 @@ if (!app.requestSingleInstanceLock()) {
     const db = new AppDatabase(app.getPath('userData'))
     const repos = new Repositories(db)
     repos.pruneHistory() // trim old history on startup (audit F-8)
+
+    // Durable HTTP cache: survives restarts and backs offline "last known good". (audit F-12)
+    const cacheStore = new SqliteCacheStore(db.raw)
+    cacheStore.prune(7 * 24 * 60 * 60 * 1000) // drop cached responses older than 7 days
+    httpClient.usePersistentCache(cacheStore)
+
     const credentials = new CredentialStore(app.getPath('userData'))
 
     registerIpc({ repos, credentials, http: httpClient, openExternal: (u) => shell.openExternal(u) })

@@ -65,6 +65,7 @@ export default function PlayerReportView({
   const persona = id.personaState.value
   const vac = report.bans.numberOfVacBans.value
   const gameBans = report.bans.numberOfGameBans.value
+  const isStale = report.dataFreshness.some((f) => f.stale)
 
   return (
     <div>
@@ -157,10 +158,26 @@ export default function PlayerReportView({
         </div>
         <div className="muted small" style={{ marginTop: 10 }}>
           {report.dataFreshness
-            .map((f) => `${f.label}: ${f.fromCache ? 'cached' : 'live'} ${relativeTime(f.fetchedAt)}`)
+            .map(
+              (f) =>
+                `${f.label}: ${f.stale ? 'offline (last known)' : f.fromCache ? 'cached' : 'live'} ${relativeTime(
+                  f.fetchedAt
+                )}`
+            )
             .join('  ·  ')}
         </div>
       </div>
+
+      {/* Offline / stale-data banner (audit F-12) */}
+      {isStale && (
+        <>
+          <div className="spacer" />
+          <div className="callout" style={{ borderLeftColor: 'var(--warn)' }}>
+            <strong>Showing last known data.</strong> A live refresh failed, so one or more sources are served from the
+            local cache and may be out of date. Use the refresh button to try again.
+          </div>
+        </>
+      )}
 
       {/* Change detection banner */}
       {report.changes.hasPrevious && report.changes.entries.length > 0 && (

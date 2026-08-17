@@ -31,6 +31,8 @@ export interface Capability<T> {
   raw?: unknown
   fromCache?: boolean
   cachedAt?: string
+  /** True when served as last-known-good because the live fetch failed. (audit F-12) */
+  stale?: boolean
 }
 
 // ---- Normalized capability payloads ----

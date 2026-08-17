@@ -112,7 +112,7 @@ export class SteamProvider implements DataProvider {
       loccountrycode: (p.loccountrycode as string) ?? null,
       realname: (p.realname as string) ?? null
     }
-    return { data, source: 'steam', raw: p, fromCache: res.fromCache, cachedAt: res.cachedAt }
+    return { data, source: 'steam', raw: p, fromCache: res.fromCache, cachedAt: res.cachedAt, stale: res.stale }
   }
 
   async getSteamLevel(ctx: ProviderContext): Promise<Capability<number>> {
@@ -129,7 +129,7 @@ export class SteamProvider implements DataProvider {
     if (!res.ok || typeof level !== 'number') {
       return { data: null, source: 'steam', issue: issue(this.name, 'private_profile'), raw: res.data }
     }
-    return { data: level, source: 'steam', raw: res.data?.response, fromCache: res.fromCache, cachedAt: res.cachedAt }
+    return { data: level, source: 'steam', raw: res.data?.response, fromCache: res.fromCache, cachedAt: res.cachedAt, stale: res.stale }
   }
 
   async getGames(ctx: ProviderContext): Promise<Capability<GamesData>> {
@@ -173,7 +173,8 @@ export class SteamProvider implements DataProvider {
       source: 'steam',
       raw: { game_count: resp.game_count },
       fromCache: res.fromCache,
-      cachedAt: res.cachedAt
+      cachedAt: res.cachedAt,
+      stale: res.stale
     }
   }
 
@@ -188,7 +189,7 @@ export class SteamProvider implements DataProvider {
       bypassCache: ctx.bypassCache
     })
     if (!res.ok || !res.data?.response?.games) {
-      return { data: [], source: 'steam', raw: res.data, fromCache: res.fromCache, cachedAt: res.cachedAt }
+      return { data: [], source: 'steam', raw: res.data, fromCache: res.fromCache, cachedAt: res.cachedAt, stale: res.stale }
     }
     const games: GameStat[] = res.data.response.games.map((g) => {
       const appId = Number(g.appid)
@@ -200,7 +201,7 @@ export class SteamProvider implements DataProvider {
         iconUrl: gameIcon(appId, g.img_icon_url as string)
       }
     })
-    return { data: games, source: 'steam', fromCache: res.fromCache, cachedAt: res.cachedAt }
+    return { data: games, source: 'steam', fromCache: res.fromCache, cachedAt: res.cachedAt, stale: res.stale }
   }
 
   async getSecurityData(ctx: ProviderContext): Promise<Capability<SecurityData>> {
@@ -232,7 +233,8 @@ export class SteamProvider implements DataProvider {
       source: 'steam',
       raw: p,
       fromCache: res.fromCache,
-      cachedAt: res.cachedAt
+      cachedAt: res.cachedAt,
+      stale: res.stale
     }
   }
 }

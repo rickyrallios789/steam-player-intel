@@ -30,6 +30,16 @@ interface CacheEntry {
   body: unknown
 }
 
+/**
+ * Durable cache backing store. Implemented over SQLite in the app so cached
+ * responses survive a restart and can be served as "last known good" when a live
+ * fetch fails (offline fallback). (audit F-12)
+ */
+export interface PersistentCache {
+  get(key: string): { status: number; body: unknown; at: number } | null
+  set(key: string, entry: { status: number; body: unknown; at: number }): void
+}
+
 const DEFAULT_LIMITS: Record<string, RateLimitOptions> = {
   'api.steampowered.com': { minIntervalMs: 350, maxRetries: 3, timeoutMs: 12_000 },
   'api.battlemetrics.com': { minIntervalMs: 1_100, maxRetries: 3, timeoutMs: 12_000 },
@@ -42,6 +52,8 @@ export interface HttpResult<T> {
   data: T | null
   fromCache: boolean
   cachedAt?: string
+  /** True when this is a last-known-good response served because the live fetch failed. */
+  stale?: boolean
   error?: string
 }
 
@@ -59,6 +71,12 @@ export class HttpClient {
   private nextAt = new Map<string, number>()
   private inFlight = new Map<string, Promise<HttpResult<unknown>>>()
   private cache = new Map<string, CacheEntry>()
+  private persistent?: PersistentCache
+
+  /** Attach a durable cache store (called once from the main process at startup). */
+  usePersistentCache(store: PersistentCache): void {
+    this.persistent = store
+  }
 
   private limitsFor(host: string): RateLimitOptions {
     return DEFAULT_LIMITS[host] ?? DEFAULT_LIMITS.default
@@ -85,6 +103,22 @@ export class HttpClient {
     return run
   }
 
+  /** Last-known-good response for offline fallback when a live fetch fails. (audit F-12) */
+  private offlineFallback<T>(cacheKey: string): HttpResult<T> | null {
+    const stored = this.persistent?.get(cacheKey)
+    const mem = this.cache.get(cacheKey)
+    const rec = stored ?? (mem ? { status: mem.status, body: mem.body, at: mem.at } : null)
+    if (!rec) return null
+    return {
+      ok: rec.status >= 200 && rec.status < 300,
+      status: rec.status,
+      data: rec.body as T,
+      fromCache: true,
+      stale: true,
+      cachedAt: new Date(rec.at).toISOString()
+    }
+  }
+
   /** Clear cached entries (all, or those whose key includes `match`). */
   clearCache(match?: string): void {
     if (!match) {
@@ -107,6 +141,18 @@ export class HttpClient {
           data: hit.body as T,
           fromCache: true,
           cachedAt: new Date(hit.at).toISOString()
+        }
+      }
+      // Warm from the durable store so a fresh launch doesn't refetch everything. (audit F-12)
+      const stored = this.persistent?.get(cacheKey)
+      if (stored && Date.now() - stored.at < ttl) {
+        this.cache.set(cacheKey, { at: stored.at, status: stored.status, body: stored.body })
+        return {
+          ok: stored.status >= 200 && stored.status < 300,
+          status: stored.status,
+          data: stored.body as T,
+          fromCache: true,
+          cachedAt: new Date(stored.at).toISOString()
         }
       }
     }
@@ -154,7 +200,15 @@ export class HttpClient {
             await sleep(backoff)
             continue
           }
-          return { ok: false, status: res.status, data: null, fromCache: false, error: lastError }
+          return (
+            this.offlineFallback<T>(cacheKey) ?? {
+              ok: false,
+              status: res.status,
+              data: null,
+              fromCache: false,
+              error: lastError
+            }
+          )
         }
 
         let body: unknown = null
@@ -168,7 +222,9 @@ export class HttpClient {
         }
 
         if (ttl > 0 && res.ok) {
-          this.cache.set(cacheKey, { at: Date.now(), status: res.status, body })
+          const at = Date.now()
+          this.cache.set(cacheKey, { at, status: res.status, body })
+          this.persistent?.set(cacheKey, { status: res.status, body, at })
         }
 
         return {
@@ -194,7 +250,15 @@ export class HttpClient {
       }
     }
 
-    return { ok: false, status: 0, data: null, fromCache: false, error: redact(lastError) || 'Request failed' }
+    return (
+      this.offlineFallback<T>(cacheKey) ?? {
+        ok: false,
+        status: 0,
+        data: null,
+        fromCache: false,
+        error: redact(lastError) || 'Request failed'
+      }
+    )
   }
 }
 

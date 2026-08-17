@@ -364,8 +364,9 @@ export async function analyzePlayer(
   if (bmConfigured) sourcesUsed.push('battlemetrics')
 
   // Per-source freshness — reflects the actual fetch/cache time, not report time. (audit F-6)
-  const freshOf = (cap: { fromCache?: boolean; cachedAt?: string }) => ({
+  const freshOf = (cap: { fromCache?: boolean; cachedAt?: string; stale?: boolean }) => ({
     fromCache: Boolean(cap.fromCache),
+    stale: Boolean(cap.stale),
     fetchedAt: cap.cachedAt ?? new Date().toISOString()
   })
   const dataFreshness: PlayerReport['dataFreshness'] = [
