@@ -63,6 +63,7 @@ export default function Dashboard({
         <div className="search-bar">
           <Search size={18} className="muted" />
           <input
+            aria-label="Steam ID, profile URL, or vanity name"
             placeholder="Paste Steam ID, profile URL, or vanity name…  e.g. 76561198000000000"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

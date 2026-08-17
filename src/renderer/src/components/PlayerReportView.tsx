@@ -119,7 +119,12 @@ export default function PlayerReportView({
               BattleMetrics <ExternalLink size={12} />
             </button>
             <div style={{ position: 'relative' }}>
-              <button className="btn small" onClick={() => setExportOpen((o) => !o)}>
+              <button
+                className="btn small"
+                onClick={() => setExportOpen((o) => !o)}
+                aria-haspopup="menu"
+                aria-expanded={exportOpen}
+              >
                 <Download size={13} /> Export <ChevronDown size={12} />
               </button>
               {exportOpen && (
@@ -140,7 +145,12 @@ export default function PlayerReportView({
                 </div>
               )}
             </div>
-            <button className="btn small" onClick={onRefresh} title="Force refresh (bypass cache)">
+            <button
+              className="btn small"
+              onClick={onRefresh}
+              title="Force refresh (bypass cache)"
+              aria-label="Force refresh (bypass cache)"
+            >
               <RefreshCw size={13} />
             </button>
           </div>

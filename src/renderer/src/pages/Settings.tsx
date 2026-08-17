@@ -90,6 +90,7 @@ export default function Settings({ status, onChange }: { status: SettingsStatus 
           <input
             className="text mono"
             type="password"
+            aria-label="Steam Web API key"
             placeholder="Paste Steam Web API key"
             value={steamKey}
             onChange={(e) => setSteamKey(e.target.value)}
@@ -106,15 +107,35 @@ export default function Settings({ status, onChange }: { status: SettingsStatus 
       </div>
 
       <div className="panel" style={{ marginBottom: 16 }}>
-        <div className="section-title">BattleMetrics API token (optional)</div>
+        <div className="section-title row center" style={{ gap: 8 }}>
+          BattleMetrics API token
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: 0.5,
+              padding: '2px 6px',
+              borderRadius: 4,
+              color: 'var(--warn)',
+              border: '1px solid var(--warn)'
+            }}
+          >
+            EXPERIMENTAL
+          </span>
+          <span className="muted small" style={{ fontWeight: 400 }}>
+            optional
+          </span>
+        </div>
         <p className="muted small" style={{ marginTop: 0 }}>
-          Only used if you have authorized API access. Enables Rust server history where your token permits. Status:{' '}
+          Experimental: BattleMetrics player matching is gated by their API, so it may return nothing even with a valid
+          token, and results are labeled experimental in reports. Only used if you have authorized API access. Status:{' '}
           {status?.battlemetricsTokenSet ? <b style={{ color: 'var(--good)' }}>configured</b> : 'not set'}
         </p>
         <div className="row" style={{ gap: 8 }}>
           <input
             className="text mono"
             type="password"
+            aria-label="BattleMetrics API token"
             placeholder="Paste BattleMetrics API token"
             value={bmToken}
             onChange={(e) => setBmToken(e.target.value)}

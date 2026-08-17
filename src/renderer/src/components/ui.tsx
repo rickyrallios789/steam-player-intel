@@ -99,7 +99,7 @@ export function CopyButton({ text, label = 'Copy' }: { text: string; label?: str
     }
   }
   return (
-    <button className="copy-btn" onClick={onCopy} title={label}>
+    <button className="copy-btn" onClick={onCopy} title={label} aria-label={label}>
       {done ? <Check size={12} /> : <Copy size={12} />}
     </button>
   )

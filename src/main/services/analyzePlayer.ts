@@ -368,7 +368,8 @@ export async function analyzePlayer(
     { source: 'steam', label: 'Steam bans', ...freshOf(securityCap) },
     { source: 'steam', label: 'Games/playtime', ...freshOf(gamesCap) }
   ]
-  if (bmConfigured) dataFreshness.push({ source: 'battlemetrics', label: 'BattleMetrics', ...freshOf(bmCap) })
+  if (bmConfigured)
+    dataFreshness.push({ source: 'battlemetrics', label: 'BattleMetrics (experimental)', ...freshOf(bmCap) })
 
   const report: PlayerReport = {
     input: {

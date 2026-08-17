@@ -149,14 +149,18 @@ export function GamesTab({ report, recentOnly }: { report: PlayerReport; recentO
         <table className="data">
           <thead>
             <tr>
-              <th onClick={() => setSort('name')}>Game</th>
-              <th onClick={() => setSort('hours')} style={{ textAlign: 'right' }}>
+              <th scope="col" onClick={() => setSort('name')} title="Sort by name">
+                Game
+              </th>
+              <th scope="col" onClick={() => setSort('hours')} style={{ textAlign: 'right' }} title="Sort by total hours">
                 Total hours
               </th>
-              <th onClick={() => setSort('recent')} style={{ textAlign: 'right' }}>
+              <th scope="col" onClick={() => setSort('recent')} style={{ textAlign: 'right' }} title="Sort by recent">
                 Last 2 weeks
               </th>
-              <th style={{ textAlign: 'right' }}>Last played</th>
+              <th scope="col" style={{ textAlign: 'right' }}>
+                Last played
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -236,8 +240,8 @@ export function RustTab({ report }: { report: PlayerReport }) {
           <FieldRow label="Last observed" field={r.lastObserved} format={(v) => unixToDisplay(Date.parse(v) / 1000)} />
           <FieldRow label="Last known server" field={r.lastKnownServer} />
           <div className="muted small" style={{ marginTop: 8 }}>
-            Rust server-level history requires an authorized BattleMetrics token or observations this app has recorded
-            over time. It is never fabricated.
+            Rust server-level history requires an authorized BattleMetrics token (experimental) or observations this app
+            has recorded over time. It is never fabricated.
           </div>
         </Panel>
       </div>
@@ -258,8 +262,9 @@ export function ServersTab({ report }: { report: PlayerReport }) {
         <div className="empty">
           No server history is available yet.
           <div className="small" style={{ marginTop: 8 }}>
-            Server appearances come from an authorized BattleMetrics token (Settings) or from observations this
-            application records over time. When none are available, nothing is shown rather than fabricated.
+            Server appearances come from an authorized BattleMetrics token (experimental — see Settings) or from
+            observations this application records over time. When none are available, nothing is shown rather than
+            fabricated.
           </div>
         </div>
       </Panel>
@@ -268,7 +273,13 @@ export function ServersTab({ report }: { report: PlayerReport }) {
   return (
     <Panel title={`Server history (${filtered.length})`}>
       <div className="row" style={{ marginBottom: 10 }}>
-        <select className="text" style={{ width: 200 }} value={game} onChange={(e) => setGame(e.target.value)}>
+        <select
+          className="text"
+          style={{ width: 200 }}
+          value={game}
+          onChange={(e) => setGame(e.target.value)}
+          aria-label="Filter servers by game"
+        >
           <option value="all">All games</option>
           {games.map((g) => (
             <option key={g} value={g}>
@@ -280,13 +291,13 @@ export function ServersTab({ report }: { report: PlayerReport }) {
       <table className="data">
         <thead>
           <tr>
-            <th>Server</th>
-            <th>Game</th>
-            <th>Region</th>
-            <th>First seen</th>
-            <th>Last seen</th>
-            <th style={{ textAlign: 'right' }}>Obs.</th>
-            <th>Source</th>
+            <th scope="col">Server</th>
+            <th scope="col">Game</th>
+            <th scope="col">Region</th>
+            <th scope="col">First seen</th>
+            <th scope="col">Last seen</th>
+            <th scope="col" style={{ textAlign: 'right' }}>Obs.</th>
+            <th scope="col">Source</th>
           </tr>
         </thead>
         <tbody>
@@ -514,7 +525,7 @@ export function NotesTab({ report }: { report: PlayerReport }) {
                 {n.body}
                 <div className="muted small">{n.created_at.split('T')[0]}</div>
               </span>
-              <button className="copy-btn" onClick={() => del(n.id)}>
+              <button className="copy-btn" onClick={() => del(n.id)} aria-label="Delete note" title="Delete note">
                 <Trash2 size={12} />
               </button>
             </div>

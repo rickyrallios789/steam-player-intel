@@ -10,6 +10,7 @@ import {
   Sun
 } from 'lucide-react'
 import { ToastProvider } from './components/ui'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import Dashboard from './pages/Dashboard'
 import HistoryPage from './pages/History'
 import Compare from './pages/Compare'
@@ -46,7 +47,11 @@ export default function App() {
   }
 
   const nav = (v: View, icon: React.ReactNode, label: string) => (
-    <button className={`nav-item ${view === v ? 'active' : ''}`} onClick={() => setView(v)}>
+    <button
+      className={`nav-item ${view === v ? 'active' : ''}`}
+      onClick={() => setView(v)}
+      aria-current={view === v ? 'page' : undefined}
+    >
       {icon}
       {label}
     </button>
@@ -85,18 +90,20 @@ export default function App() {
         </aside>
 
         <main className="main">
-          {view === 'dashboard' && (
-            <Dashboard
-              status={status}
-              pendingQuery={pendingQuery}
-              clearPending={() => setPendingQuery(null)}
-              goSettings={() => setView('settings')}
-            />
-          )}
-          {view === 'history' && <HistoryPage onAnalyze={analyzeFromElsewhere} favoritesOnly={false} />}
-          {view === 'favorites' && <HistoryPage onAnalyze={analyzeFromElsewhere} favoritesOnly={true} />}
-          {view === 'compare' && <Compare status={status} />}
-          {view === 'settings' && <Settings status={status} onChange={refreshStatus} />}
+          <ErrorBoundary resetKey={view} label="this view">
+            {view === 'dashboard' && (
+              <Dashboard
+                status={status}
+                pendingQuery={pendingQuery}
+                clearPending={() => setPendingQuery(null)}
+                goSettings={() => setView('settings')}
+              />
+            )}
+            {view === 'history' && <HistoryPage onAnalyze={analyzeFromElsewhere} favoritesOnly={false} />}
+            {view === 'favorites' && <HistoryPage onAnalyze={analyzeFromElsewhere} favoritesOnly={true} />}
+            {view === 'compare' && <Compare status={status} />}
+            {view === 'settings' && <Settings status={status} onChange={refreshStatus} />}
+          </ErrorBoundary>
         </main>
       </div>
     </ToastProvider>
