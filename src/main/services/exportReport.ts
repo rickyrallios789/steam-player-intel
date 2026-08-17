@@ -5,8 +5,9 @@
  */
 import { BrowserWindow } from 'electron'
 import { writeFile } from 'node:fs/promises'
-import type { Field, GameStat, PlayerReport } from '../../shared/types'
+import type { Field, PlayerReport } from '../../shared/types'
 import { formatHours } from '../../shared/format'
+import { gamesToCsv } from '../../shared/csv'
 
 export type ExportFormat = 'json' | 'txt' | 'csv' | 'pdf'
 
@@ -72,22 +73,6 @@ function buildTxt(r: PlayerReport): string {
   return lines.join('\n')
 }
 
-function buildCsv(games: GameStat[]): string {
-  const header = 'appId,name,playtime_hours,playtime_2weeks_hours'
-  const rows = games
-    .slice()
-    .sort((a, b) => b.playtimeForeverMinutes - a.playtimeForeverMinutes)
-    .map((g) =>
-      [
-        g.appId,
-        JSON.stringify(g.name ?? ''),
-        (g.playtimeForeverMinutes / 60).toFixed(1),
-        (g.playtime2weeksMinutes / 60).toFixed(1)
-      ].join(',')
-    )
-  return [header, ...rows].join('\n')
-}
-
 function esc(s: string): string {
   return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string)
 }
@@ -150,7 +135,7 @@ export async function exportReport(report: PlayerReport, format: ExportFormat, f
       await writeFile(filePath, buildTxt(report), 'utf8')
       break
     case 'csv':
-      await writeFile(filePath, buildCsv(report.games.allGames.value ?? []), 'utf8')
+      await writeFile(filePath, gamesToCsv(report.games.allGames.value ?? []), 'utf8')
       break
     case 'pdf': {
       const pdf = await toPdf(buildHtml(report))

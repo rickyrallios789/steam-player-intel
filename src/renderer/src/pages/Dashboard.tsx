@@ -87,11 +87,18 @@ export default function Dashboard({
       {!status?.steamKeySet && !report && !loading && (
         <div className="search-wrap" style={{ marginTop: 18 }}>
           <div className="callout info">
-            No Steam Web API key is configured yet. Add one in{' '}
-            <a onClick={goSettings} style={{ cursor: 'pointer' }}>
-              Settings
-            </a>{' '}
-            to enable lookups. You can get a free key at steamcommunity.com/dev/apikey.
+            <strong>Welcome to Steam Player Intel.</strong> Three quick steps to your first lookup:
+            <ol style={{ margin: '8px 0 0', paddingLeft: 20 }}>
+              <li>Grab a free Steam Web API key at steamcommunity.com/dev/apikey.</li>
+              <li>
+                Paste it into{' '}
+                <a onClick={goSettings} style={{ cursor: 'pointer' }}>
+                  Settings
+                </a>
+                .
+              </li>
+              <li>Come back here and enter any Steam ID, profile URL, or vanity name above.</li>
+            </ol>
           </div>
         </div>
       )}

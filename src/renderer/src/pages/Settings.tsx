@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react'
-import { KeyRound, ShieldCheck, ShieldAlert, Save, Trash2, DownloadCloud, RotateCw, Loader2 } from 'lucide-react'
+import {
+  KeyRound,
+  ShieldCheck,
+  ShieldAlert,
+  Save,
+  Trash2,
+  DownloadCloud,
+  RotateCw,
+  Loader2,
+  Github,
+  ExternalLink
+} from 'lucide-react'
 import { useToast } from '../components/ui'
 import type { SettingsStatus, UpdateStatus } from '../global'
 
@@ -182,6 +193,70 @@ export default function Settings({ status, onChange }: { status: SettingsStatus 
           </button>
         </div>
       </div>
+
+      <div className="panel" style={{ marginTop: 16 }}>
+        <div className="section-title">About &amp; diagnostics</div>
+        <p className="muted small" style={{ marginTop: 0 }}>
+          Steam Player Intel analyzes publicly available Steam account data from a single ID. It never fabricates data —
+          every value is labeled with its source and status, and private or unavailable fields are shown as such.
+        </p>
+        <div className="row wrap" style={{ gap: 8, marginBottom: 12 }}>
+          <button
+            className="btn small"
+            onClick={() => window.api.openExternal('https://github.com/rickyrallios789/steam-player-intel')}
+          >
+            <Github size={13} /> Project on GitHub <ExternalLink size={12} />
+          </button>
+          <button className="btn small" onClick={() => window.api.openExternal('https://steamcommunity.com/dev/apikey')}>
+            <KeyRound size={13} /> Get a Steam API key <ExternalLink size={12} />
+          </button>
+        </div>
+        <div className="field-row">
+          <span className="k">Version</span>
+          <span className="v mono">v{version || '…'}</span>
+        </div>
+        <Diag
+          label="Credential encryption"
+          ok={!!status?.encryptionAvailable}
+          okText="Active (OS keychain)"
+          badText="Unavailable — session only"
+        />
+        <Diag label="Steam Web API key" ok={!!status?.steamKeySet} okText="Configured" badText="Not set" />
+        <Diag
+          label="BattleMetrics token (experimental)"
+          ok={!!status?.battlemetricsTokenSet}
+          okText="Configured"
+          badText="Not set"
+          neutralBad
+        />
+        <Diag
+          label="Local history storage"
+          ok={!!status?.persistent}
+          okText="Enabled on this device"
+          badText="In-memory only"
+        />
+      </div>
+    </div>
+  )
+}
+
+function Diag({
+  label,
+  ok,
+  okText,
+  badText,
+  neutralBad
+}: {
+  label: string
+  ok: boolean
+  okText: string
+  badText: string
+  neutralBad?: boolean
+}) {
+  return (
+    <div className="field-row">
+      <span className="k">{label}</span>
+      <span className={`status-pill ${ok ? 'clean' : neutralBad ? 'unknown' : 'warn'}`}>{ok ? okText : badText}</span>
     </div>
   )
 }
