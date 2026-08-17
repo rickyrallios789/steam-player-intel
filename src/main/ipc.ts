@@ -69,6 +69,10 @@ export function registerIpc(deps: IpcDeps): void {
     deps.repos.deletePlayer(assertSteam64(p.steam64))
     return { ok: true }
   })
+  ipcMain.handle('history:clearAll', async () => {
+    deps.repos.clearAllHistory()
+    return { ok: true }
+  })
 
   // ---- Notes (user-entered) ----
   ipcMain.handle('notes:list', async (_e, p: { steam64: string }) => deps.repos.listNotes(assertSteam64(p.steam64)))

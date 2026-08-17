@@ -146,8 +146,9 @@ export default function PlayerReportView({
           </div>
         </div>
         <div className="muted small" style={{ marginTop: 10 }}>
-          Last updated {relativeTime(report.generatedAt)} · Sources: {report.sourcesUsed.join(', ')} · Data may be
-          cached.
+          {report.dataFreshness
+            .map((f) => `${f.label}: ${f.fromCache ? 'cached' : 'live'} ${relativeTime(f.fetchedAt)}`)
+            .join('  ·  ')}
         </div>
       </div>
 

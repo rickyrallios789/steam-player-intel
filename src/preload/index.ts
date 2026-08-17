@@ -50,7 +50,8 @@ const api = {
     list: (): Promise<HistoryItem[]> => ipcRenderer.invoke('history:list'),
     setFavorite: (steam64: string, favorite: boolean) =>
       ipcRenderer.invoke('history:setFavorite', { steam64, favorite }),
-    remove: (steam64: string) => ipcRenderer.invoke('history:delete', { steam64 })
+    remove: (steam64: string) => ipcRenderer.invoke('history:delete', { steam64 }),
+    clearAll: () => ipcRenderer.invoke('history:clearAll')
   },
   notes: {
     list: (steam64: string): Promise<NoteItem[]> => ipcRenderer.invoke('notes:list', { steam64 }),

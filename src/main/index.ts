@@ -77,6 +77,7 @@ if (!app.requestSingleInstanceLock()) {
 
     const db = new AppDatabase(app.getPath('userData'))
     const repos = new Repositories(db)
+    repos.pruneHistory() // trim old history on startup (audit F-8)
     const credentials = new CredentialStore(app.getPath('userData'))
 
     registerIpc({ repos, credentials, http: httpClient, openExternal: (u) => shell.openExternal(u) })

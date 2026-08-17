@@ -48,6 +48,7 @@ export interface RendererApi {
     list(): Promise<HistoryItem[]>
     setFavorite(steam64: string, favorite: boolean): Promise<{ ok: boolean }>
     remove(steam64: string): Promise<{ ok: boolean }>
+    clearAll(): Promise<{ ok: boolean }>
   }
   notes: {
     list(steam64: string): Promise<NoteItem[]>

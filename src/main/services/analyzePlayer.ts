@@ -358,6 +358,18 @@ export async function analyzePlayer(
   const sourcesUsed: DataSource[] = ['steam', 'derived', 'application']
   if (bmConfigured) sourcesUsed.push('battlemetrics')
 
+  // Per-source freshness — reflects the actual fetch/cache time, not report time. (audit F-6)
+  const freshOf = (cap: { fromCache?: boolean; cachedAt?: string }) => ({
+    fromCache: Boolean(cap.fromCache),
+    fetchedAt: cap.cachedAt ?? new Date().toISOString()
+  })
+  const dataFreshness: PlayerReport['dataFreshness'] = [
+    { source: 'steam', label: 'Steam profile', ...freshOf(profileCap) },
+    { source: 'steam', label: 'Steam bans', ...freshOf(securityCap) },
+    { source: 'steam', label: 'Games/playtime', ...freshOf(gamesCap) }
+  ]
+  if (bmConfigured) dataFreshness.push({ source: 'battlemetrics', label: 'BattleMetrics', ...freshOf(bmCap) })
+
   const report: PlayerReport = {
     input: {
       raw: opts.raw,
@@ -383,6 +395,7 @@ export async function analyzePlayer(
     application: appHistory,
     issues,
     sourcesUsed,
+    dataFreshness,
     generatedAt: new Date().toISOString(),
     raw
   }

@@ -28,9 +28,40 @@ export class Repositories {
       .get(steam64) as ScanRow | undefined
   }
 
+  private rowToSnapshot(r: ScanRow): PlayerSnapshot {
+    return {
+      displayName: r.display_name,
+      avatarHash: r.avatar_hash,
+      steamLevel: r.steam_level,
+      gameCount: r.game_count,
+      totalPlaytimeMinutes: r.total_playtime_min,
+      rustPlaytimeMinutes: r.rust_playtime_min,
+      vacBans: r.vac_bans,
+      gameBans: r.game_bans,
+      communityBanned: r.community_banned == null ? null : r.community_banned === 1,
+      visibility: r.visibility
+    }
+  }
+
+  private sameSnapshot(a: PlayerSnapshot, b: PlayerSnapshot): boolean {
+    return (
+      a.displayName === b.displayName &&
+      a.avatarHash === b.avatarHash &&
+      a.steamLevel === b.steamLevel &&
+      a.gameCount === b.gameCount &&
+      a.totalPlaytimeMinutes === b.totalPlaytimeMinutes &&
+      a.rustPlaytimeMinutes === b.rustPlaytimeMinutes &&
+      a.vacBans === b.vacBans &&
+      a.gameBans === b.gameBans &&
+      a.communityBanned === b.communityBanned &&
+      a.visibility === b.visibility
+    )
+  }
+
   /**
    * Record a scan: read the previous latest scan (for change detection), upsert
-   * the player, insert the new scan and update name history — all atomically.
+   * the player, and store a NEW scan row only when the snapshot actually changed
+   * (dedup, audit F-8). scan_count still counts every look-up. Atomic.
    */
   recordScan(steam64: string, snapshot: PlayerSnapshot, nowIso = new Date().toISOString()): HistoryRecord {
     const tx = this.db.transaction((): HistoryRecord => {
@@ -51,38 +82,67 @@ export class Repositories {
           .run(steam64, nowIso, nowIso, snapshot.displayName)
       }
 
-      const info = this.db
-        .prepare(
-          `INSERT INTO scans
-            (steam64, scanned_at, display_name, avatar_hash, steam_level, game_count,
-             total_playtime_min, rust_playtime_min, vac_bans, game_bans, community_banned, visibility)
-           VALUES (@steam64, @scanned_at, @display_name, @avatar_hash, @steam_level, @game_count,
-             @total_playtime_min, @rust_playtime_min, @vac_bans, @game_bans, @community_banned, @visibility)`
-        )
-        .run({
-          steam64,
-          scanned_at: nowIso,
-          display_name: snapshot.displayName,
-          avatar_hash: snapshot.avatarHash,
-          steam_level: snapshot.steamLevel,
-          game_count: snapshot.gameCount,
-          total_playtime_min: snapshot.totalPlaytimeMinutes,
-          rust_playtime_min: snapshot.rustPlaytimeMinutes,
-          vac_bans: snapshot.vacBans,
-          game_bans: snapshot.gameBans,
-          community_banned: snapshot.communityBanned == null ? null : snapshot.communityBanned ? 1 : 0,
-          visibility: snapshot.visibility
-        })
+      // Store a scan row only when something actually changed vs the last one.
+      let newScan: ScanRow | null = previousScan
+      const changed = !previousScan || !this.sameSnapshot(this.rowToSnapshot(previousScan), snapshot)
+      if (changed) {
+        const info = this.db
+          .prepare(
+            `INSERT INTO scans
+              (steam64, scanned_at, display_name, avatar_hash, steam_level, game_count,
+               total_playtime_min, rust_playtime_min, vac_bans, game_bans, community_banned, visibility)
+             VALUES (@steam64, @scanned_at, @display_name, @avatar_hash, @steam_level, @game_count,
+               @total_playtime_min, @rust_playtime_min, @vac_bans, @game_bans, @community_banned, @visibility)`
+          )
+          .run({
+            steam64,
+            scanned_at: nowIso,
+            display_name: snapshot.displayName,
+            avatar_hash: snapshot.avatarHash,
+            steam_level: snapshot.steamLevel,
+            game_count: snapshot.gameCount,
+            total_playtime_min: snapshot.totalPlaytimeMinutes,
+            rust_playtime_min: snapshot.rustPlaytimeMinutes,
+            vac_bans: snapshot.vacBans,
+            game_bans: snapshot.gameBans,
+            community_banned: snapshot.communityBanned == null ? null : snapshot.communityBanned ? 1 : 0,
+            visibility: snapshot.visibility
+          })
+        newScan = this.db.prepare('SELECT * FROM scans WHERE id = ?').get(info.lastInsertRowid) as ScanRow
+      }
 
       if (snapshot.displayName) {
         this.recordNameObservation(steam64, snapshot.displayName, nowIso)
       }
 
-      const newScan = this.db.prepare('SELECT * FROM scans WHERE id = ?').get(info.lastInsertRowid) as ScanRow
       const player = this.getPlayer(steam64)!
-      return { player, previousScan, newScan }
+      return { player, previousScan, newScan: newScan! }
     })
     return tx()
+  }
+
+  /** Keep only the most recent `keepPerPlayer` scans per player. (audit F-8) */
+  pruneHistory(keepPerPlayer = 200): void {
+    this.db
+      .prepare(
+        `DELETE FROM scans WHERE id IN (
+           SELECT id FROM (
+             SELECT id, ROW_NUMBER() OVER (PARTITION BY steam64 ORDER BY scanned_at DESC, id DESC) AS rn
+             FROM scans
+           ) WHERE rn > ?
+         )`
+      )
+      .run(keepPerPlayer)
+  }
+
+  /** Wipe all locally stored player history, notes and tags. (audit F-8, spec §25) */
+  clearAllHistory(): void {
+    const tx = this.db.transaction(() => {
+      for (const t of ['scans', 'name_observations', 'server_observations', 'notes', 'tags', 'players']) {
+        this.db.prepare(`DELETE FROM ${t}`).run()
+      }
+    })
+    tx()
   }
 
   recordNameObservation(steam64: string, name: string, nowIso: string): void {
@@ -126,12 +186,15 @@ export class Repositories {
     const players = this.db
       .prepare('SELECT * FROM players ORDER BY last_observed DESC')
       .all() as PlayerRow[]
-    return players.map((p) => ({
-      ...p,
-      tags: (this.db.prepare('SELECT tag FROM tags WHERE steam64 = ?').all(p.steam64) as { tag: string }[]).map(
-        (t) => t.tag
-      )
-    }))
+    // Single tags query instead of one-per-player (audit F-10).
+    const tagRows = this.db.prepare('SELECT steam64, tag FROM tags').all() as { steam64: string; tag: string }[]
+    const byId = new Map<string, string[]>()
+    for (const t of tagRows) {
+      const arr = byId.get(t.steam64)
+      if (arr) arr.push(t.tag)
+      else byId.set(t.steam64, [t.tag])
+    }
+    return players.map((p) => ({ ...p, tags: byId.get(p.steam64) ?? [] }))
   }
 
   setFavorite(steam64: string, favorite: boolean): void {

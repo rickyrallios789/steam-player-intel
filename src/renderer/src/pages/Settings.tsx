@@ -131,7 +131,7 @@ export default function Settings({ status, onChange }: { status: SettingsStatus 
       </div>
 
       <div className="panel">
-        <div className="section-title">Cache</div>
+        <div className="section-title">Data & cache</div>
         <div className="row center between">
           <span className="muted small">Clear all cached API responses to force fresh data on the next scan.</span>
           <button
@@ -142,6 +142,22 @@ export default function Settings({ status, onChange }: { status: SettingsStatus 
             }}
           >
             <KeyRound size={14} /> Clear cache
+          </button>
+        </div>
+        <div className="row center between" style={{ marginTop: 12 }}>
+          <span className="muted small">
+            Delete all locally stored player history, notes and tags. This cannot be undone.
+          </span>
+          <button
+            className="btn"
+            onClick={async () => {
+              if (!window.confirm('Delete all locally stored player history, notes and tags? This cannot be undone.'))
+                return
+              await window.api.history.clearAll()
+              toast('All history cleared')
+            }}
+          >
+            <Trash2 size={14} /> Clear all history
           </button>
         </div>
       </div>
