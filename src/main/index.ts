@@ -20,6 +20,7 @@ import { httpClient } from './core/httpClient'
 import { registerIpc } from './ipc'
 import { loadEnvFile } from './env'
 import { initUpdater, checkForUpdates } from './updater'
+import { MonitorService } from './services/monitor'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -87,7 +88,17 @@ if (!app.requestSingleInstanceLock()) {
 
     const credentials = new CredentialStore(app.getPath('userData'))
 
-    registerIpc({ repos, credentials, http: httpClient, openExternal: (u) => shell.openExternal(u) })
+    // Background watchlist monitor: re-scan favorites and notify on new bans /
+    // privacy flips. Only runs if the user has enabled it. (watchlist feature)
+    const monitor = new MonitorService({
+      repos,
+      credentials,
+      http: httpClient,
+      getMainWindow: () => mainWindow
+    })
+    if (repos.getSetting('monitor.enabled') === '1') monitor.start()
+
+    registerIpc({ repos, credentials, http: httpClient, monitor, openExternal: (u) => shell.openExternal(u) })
 
     createWindow()
 

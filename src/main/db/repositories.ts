@@ -201,6 +201,29 @@ export class Repositories {
     this.db.prepare('UPDATE players SET favorite = ? WHERE steam64 = ?').run(favorite ? 1 : 0, steam64)
   }
 
+  /** Steam64 ids of favorited players — the set the background monitor watches. */
+  listFavorites(): string[] {
+    return (
+      this.db
+        .prepare('SELECT steam64 FROM players WHERE favorite = 1 ORDER BY last_observed DESC')
+        .all() as { steam64: string }[]
+    ).map((r) => r.steam64)
+  }
+
+  // ---- App settings (small key/value store, e.g. monitoring on/off) ----
+  getSetting(key: string): string | null {
+    const row = this.db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key) as
+      | { value: string }
+      | undefined
+    return row?.value ?? null
+  }
+
+  setSetting(key: string, value: string): void {
+    this.db
+      .prepare('INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+      .run(key, value)
+  }
+
   deletePlayer(steam64: string): void {
     const tx = this.db.transaction(() => {
       this.db.prepare('DELETE FROM scans WHERE steam64 = ?').run(steam64)

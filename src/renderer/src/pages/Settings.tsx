@@ -9,7 +9,10 @@ import {
   RotateCw,
   Loader2,
   Github,
-  ExternalLink
+  ExternalLink,
+  BellRing,
+  BellOff,
+  RefreshCw
 } from 'lucide-react'
 import { useToast } from '../components/ui'
 import type { SettingsStatus, UpdateStatus } from '../global'
@@ -19,11 +22,14 @@ export default function Settings({ status, onChange }: { status: SettingsStatus 
   const [bmToken, setBmToken] = useState('')
   const [version, setVersion] = useState('')
   const [upd, setUpd] = useState<UpdateStatus>({ state: 'idle' })
+  const [monitorOn, setMonitorOn] = useState(false)
+  const [checking, setChecking] = useState(false)
   const toast = useToast()
 
   useEffect(() => {
     window.api.appInfo().then((i) => setVersion(i.version))
     window.api.updates.current().then(setUpd)
+    window.api.monitor.status().then((s) => setMonitorOn(s.enabled))
     const off = window.api.updates.onStatus(setUpd)
     return off
   }, [])
@@ -62,6 +68,56 @@ export default function Settings({ status, onChange }: { status: SettingsStatus 
             {upd.state === 'checking' ? <Loader2 size={14} className="spin" /> : <DownloadCloud size={14} />} Check for
             updates
           </button>
+        </div>
+      </div>
+
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <div className="section-title">Background monitoring</div>
+        <p className="muted small" style={{ marginTop: 0 }}>
+          When on, this app re-checks your <b>favorited</b> players about every 6 hours and shows a desktop notification
+          if one gets a <b>new ban</b> or their profile <b>flips to private</b>. It runs locally and only scans accounts
+          you have favorited; clicking a notification opens that player here.
+        </p>
+        <div className="row center between" style={{ gap: 12 }}>
+          <span className="row center" style={{ gap: 8 }}>
+            {monitorOn ? (
+              <BellRing size={16} style={{ color: 'var(--good)' }} />
+            ) : (
+              <BellOff size={16} className="muted" />
+            )}
+            <span>{monitorOn ? 'Monitoring your favorites every 6 hours' : 'Monitoring is off'}</span>
+          </span>
+          <div className="row" style={{ gap: 8 }}>
+            <button
+              className="btn"
+              disabled={!monitorOn || checking}
+              onClick={async () => {
+                setChecking(true)
+                try {
+                  const r = await window.api.monitor.runNow()
+                  toast(
+                    `Checked ${r.checked} favorite${r.checked === 1 ? '' : 's'} · ${r.alerts} alert${
+                      r.alerts === 1 ? '' : 's'
+                    }`
+                  )
+                } finally {
+                  setChecking(false)
+                }
+              }}
+            >
+              {checking ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />} Check now
+            </button>
+            <button
+              className={`btn ${monitorOn ? '' : 'primary'}`}
+              onClick={async () => {
+                const r = await window.api.monitor.setEnabled(!monitorOn)
+                setMonitorOn(r.enabled)
+                toast(r.enabled ? 'Background monitoring enabled' : 'Background monitoring disabled')
+              }}
+            >
+              {monitorOn ? 'Turn off' : 'Turn on'}
+            </button>
+          </div>
         </div>
       </div>
 

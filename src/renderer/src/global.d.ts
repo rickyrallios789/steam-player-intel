@@ -32,6 +32,12 @@ export interface RendererApi {
     current(): Promise<UpdateStatus>
     onStatus(cb: (status: UpdateStatus) => void): () => void
   }
+  monitor: {
+    status(): Promise<{ enabled: boolean }>
+    setEnabled(enabled: boolean): Promise<{ enabled: boolean }>
+    runNow(): Promise<{ checked: number; alerts: number }>
+    onOpen(cb: (steam64: string) => void): () => void
+  }
   openExternal(url: string): Promise<{ ok: boolean }>
   exportReport(
     report: PlayerReport,

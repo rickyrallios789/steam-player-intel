@@ -46,6 +46,15 @@ export default function App() {
     setView('dashboard')
   }
 
+  // Clicking a background-monitor notification opens that player here.
+  useEffect(() => {
+    const off = window.api.monitor.onOpen((steam64) => {
+      setPendingQuery(steam64)
+      setView('dashboard')
+    })
+    return off
+  }, [])
+
   const nav = (v: View, icon: React.ReactNode, label: string) => (
     <button
       className={`nav-item ${view === v ? 'active' : ''}`}

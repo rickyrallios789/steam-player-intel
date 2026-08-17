@@ -111,6 +111,11 @@ CREATE TABLE IF NOT EXISTS http_cache (
   body       TEXT,
   fetched_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT
+);
 `
 
 export class AppDatabase {

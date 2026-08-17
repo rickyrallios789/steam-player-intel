@@ -9,6 +9,7 @@ import type { Repositories } from './db/repositories'
 import type { HttpClient } from './core/httpClient'
 import { analyzePlayer } from './services/analyzePlayer'
 import { exportReport, type ExportFormat } from './services/exportReport'
+import type { MonitorService } from './services/monitor'
 import { checkForUpdates, quitAndInstall, getLastStatus } from './updater'
 import { isValidSteam64 } from '../shared/steamid'
 import type { PlayerReport } from '../shared/types'
@@ -17,6 +18,7 @@ export interface IpcDeps {
   repos: Repositories
   credentials: CredentialStore
   http: HttpClient
+  monitor: MonitorService
   openExternal: (url: string) => void
 }
 
@@ -126,6 +128,17 @@ export function registerIpc(deps: IpcDeps): void {
   )
 
   ipcMain.handle('app:info', async () => ({ version: app.getVersion(), name: app.getName() }))
+
+  // ---- Watchlist monitoring ----
+  ipcMain.handle('monitor:status', async () => ({ enabled: deps.monitor.isActive }))
+  ipcMain.handle('monitor:setEnabled', async (_e, p: { enabled: boolean }) => {
+    const enabled = !!p?.enabled
+    deps.repos.setSetting('monitor.enabled', enabled ? '1' : '0')
+    if (enabled) deps.monitor.start()
+    else deps.monitor.stop()
+    return { enabled: deps.monitor.isActive }
+  })
+  ipcMain.handle('monitor:runNow', async () => deps.monitor.runOnce())
 
   // ---- Auto-update ----
   ipcMain.handle('update:check', async () => {

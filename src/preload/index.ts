@@ -45,6 +45,17 @@ const api = {
       return () => ipcRenderer.removeListener('update:status', listener)
     }
   },
+  monitor: {
+    status: (): Promise<{ enabled: boolean }> => ipcRenderer.invoke('monitor:status'),
+    setEnabled: (enabled: boolean): Promise<{ enabled: boolean }> =>
+      ipcRenderer.invoke('monitor:setEnabled', { enabled }),
+    runNow: (): Promise<{ checked: number; alerts: number }> => ipcRenderer.invoke('monitor:runNow'),
+    onOpen: (cb: (steam64: string) => void): (() => void) => {
+      const listener = (_e: unknown, p: { steam64: string }) => cb(p.steam64)
+      ipcRenderer.on('monitor:open', listener)
+      return () => ipcRenderer.removeListener('monitor:open', listener)
+    }
+  },
   openExternal: (url: string) => ipcRenderer.invoke('external:open', { url }),
   exportReport: (
     report: PlayerReport,
