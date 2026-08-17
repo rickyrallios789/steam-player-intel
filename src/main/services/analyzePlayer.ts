@@ -280,8 +280,13 @@ export async function analyzePlayer(
         ? field(Number(((rustMinutes / totalMin) * 100).toFixed(1)), 'derived', 'inferred')
         : missing('derived', 'unknown'),
     firstObserved: appHistory.firstObserved
-      ? field(appHistory.firstObserved, 'application', 'inferred', 'First time THIS app observed the account.')
-      : missing('application', 'unknown', 'Not yet observed by this application.'),
+      ? field(
+          appHistory.firstObserved,
+          'application',
+          'inferred',
+          'First time this app scanned this account (account-wide — not Rust-specific).'
+        )
+      : missing('application', 'unknown', 'Not yet scanned by this application.'),
     lastObserved: appHistory.lastObserved
       ? field(appHistory.lastObserved, 'application', 'inferred')
       : missing('application', 'unknown'),

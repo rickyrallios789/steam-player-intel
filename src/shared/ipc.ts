@@ -1,0 +1,48 @@
+/**
+ * Shared IPC contract types — the single source of truth for the small data
+ * shapes that cross the main ⇆ preload ⇆ renderer boundary. Previously these were
+ * declared separately in preload, the renderer's global.d.ts and the updater,
+ * which allowed them to drift. Define once here and import everywhere. (audit F-13)
+ */
+import type { PlayerReport } from './types'
+
+export interface SettingsStatus {
+  steamKeySet: boolean
+  battlemetricsTokenSet: boolean
+  encryptionAvailable: boolean
+  persistent: boolean
+}
+
+export interface AnalyzeResult {
+  ok: boolean
+  report?: PlayerReport
+  error?: string
+  detectedLabel?: string
+}
+
+export interface HistoryItem {
+  steam64: string
+  first_observed: string
+  last_observed: string
+  scan_count: number
+  favorite: number
+  display_name: string | null
+  tags: string[]
+}
+
+export interface NoteItem {
+  id: number
+  steam64: string
+  body: string
+  created_at: string
+}
+
+export type UpdateStatus =
+  | { state: 'idle' }
+  | { state: 'dev'; message: string }
+  | { state: 'checking' }
+  | { state: 'available'; version: string }
+  | { state: 'not-available'; version: string }
+  | { state: 'downloading'; percent: number }
+  | { state: 'downloaded'; version: string }
+  | { state: 'error'; message: string }

@@ -10,17 +10,13 @@
 import electronUpdater from 'electron-updater'
 import { app, BrowserWindow } from 'electron'
 
+import type { UpdateStatus } from '../shared/ipc'
+
 const { autoUpdater } = electronUpdater
 
-export type UpdateStatus =
-  | { state: 'idle' }
-  | { state: 'dev'; message: string }
-  | { state: 'checking' }
-  | { state: 'available'; version: string }
-  | { state: 'not-available'; version: string }
-  | { state: 'downloading'; percent: number }
-  | { state: 'downloaded'; version: string }
-  | { state: 'error'; message: string }
+// Re-exported so existing importers of '../main/updater' keep working; the type
+// itself now lives once in src/shared/ipc.ts. (audit F-13)
+export type { UpdateStatus }
 
 let lastStatus: UpdateStatus = { state: 'idle' }
 let initialized = false

@@ -1,42 +1,8 @@
 import type { PlayerReport } from '@shared/types'
+import type { SettingsStatus, AnalyzeResult, HistoryItem, NoteItem, UpdateStatus } from '@shared/ipc'
 
-export interface SettingsStatus {
-  steamKeySet: boolean
-  battlemetricsTokenSet: boolean
-  encryptionAvailable: boolean
-  persistent: boolean
-}
-export interface AnalyzeResult {
-  ok: boolean
-  report?: PlayerReport
-  error?: string
-  detectedLabel?: string
-}
-export interface HistoryItem {
-  steam64: string
-  first_observed: string
-  last_observed: string
-  scan_count: number
-  favorite: number
-  display_name: string | null
-  tags: string[]
-}
-export interface NoteItem {
-  id: number
-  steam64: string
-  body: string
-  created_at: string
-}
-
-export type UpdateStatus =
-  | { state: 'idle' }
-  | { state: 'dev'; message: string }
-  | { state: 'checking' }
-  | { state: 'available'; version: string }
-  | { state: 'not-available'; version: string }
-  | { state: 'downloading'; percent: number }
-  | { state: 'downloaded'; version: string }
-  | { state: 'error'; message: string }
+// Re-export the shared IPC types so existing `from '../global'` imports keep working. (audit F-13)
+export type { SettingsStatus, AnalyzeResult, HistoryItem, NoteItem, UpdateStatus }
 
 export interface RendererApi {
   settings: {

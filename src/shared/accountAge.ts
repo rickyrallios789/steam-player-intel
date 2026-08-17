@@ -11,19 +11,44 @@ export interface AgeParts {
   totalYears: number
 }
 
-/** Break a duration (in seconds) into years / months / days. Calendar-approximate. */
+/**
+ * Break a duration into years / months / days using real calendar math (UTC),
+ * so the human-readable breakdown does not drift by weeks over long spans the way
+ * a fixed 365/30 division does. `totalDays` remains the exact day count used by
+ * downstream calculations. (audit F-11)
+ */
 export function ageBreakdown(fromUnix: number, nowUnix: number): AgeParts {
   const totalDays = Math.max(0, Math.floor((nowUnix - fromUnix) / DAY_SECONDS))
-  const years = Math.floor(totalDays / 365)
-  const remAfterYears = totalDays - years * 365
-  const months = Math.floor(remAfterYears / 30)
-  const days = remAfterYears - months * 30
+  const nowMs = nowUnix * 1000
+  const from = new Date(fromUnix * 1000)
+
+  // Walk whole calendar years, then whole calendar months, then leftover days,
+  // letting Date handle real month lengths and leap years. No 365/30 drift.
+  let years = 0
+  let months = 0
+  const cur = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()))
+  for (;;) {
+    const next = new Date(Date.UTC(cur.getUTCFullYear() + 1, cur.getUTCMonth(), cur.getUTCDate()))
+    if (next.getTime() <= nowMs) {
+      years++
+      cur.setTime(next.getTime())
+    } else break
+  }
+  for (;;) {
+    const next = new Date(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth() + 1, cur.getUTCDate()))
+    if (next.getTime() <= nowMs) {
+      months++
+      cur.setTime(next.getTime())
+    } else break
+  }
+  const days = Math.max(0, Math.floor((nowMs - cur.getTime()) / (DAY_SECONDS * 1000)))
+
   return {
     years,
     months,
     days,
     totalDays,
-    totalYears: Number((totalDays / 365).toFixed(1))
+    totalYears: Number((totalDays / 365.25).toFixed(1))
   }
 }
 

@@ -5,38 +5,8 @@
  */
 import { contextBridge, ipcRenderer } from 'electron'
 import type { PlayerReport } from '../shared/types'
-import type { UpdateStatus } from '../main/updater'
-
-export interface SettingsStatus {
-  steamKeySet: boolean
-  battlemetricsTokenSet: boolean
-  encryptionAvailable: boolean
-  persistent: boolean
-}
-
-export interface AnalyzeResult {
-  ok: boolean
-  report?: PlayerReport
-  error?: string
-  detectedLabel?: string
-}
-
-export interface HistoryItem {
-  steam64: string
-  first_observed: string
-  last_observed: string
-  scan_count: number
-  favorite: number
-  display_name: string | null
-  tags: string[]
-}
-
-export interface NoteItem {
-  id: number
-  steam64: string
-  body: string
-  created_at: string
-}
+// IPC contract types now live once in src/shared/ipc.ts. (audit F-13)
+import type { SettingsStatus, AnalyzeResult, HistoryItem, NoteItem, UpdateStatus } from '../shared/ipc'
 
 const api = {
   settings: {

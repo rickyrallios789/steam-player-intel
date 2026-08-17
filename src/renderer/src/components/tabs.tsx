@@ -235,13 +235,22 @@ export function RustTab({ report }: { report: PlayerReport }) {
           <FieldRow label="Recent hours" field={r.recentHours} format={(v) => `${v}h`} />
           <FieldRow label="% of total playtime" field={r.percentOfTotalPlaytime} format={(v) => `${v}%`} />
         </Panel>
-        <Panel title="Rust observations (this application)">
-          <FieldRow label="First observed" field={r.firstObserved} format={(v) => unixToDisplay(Date.parse(v) / 1000)} />
-          <FieldRow label="Last observed" field={r.lastObserved} format={(v) => unixToDisplay(Date.parse(v) / 1000)} />
-          <FieldRow label="Last known server" field={r.lastKnownServer} />
+        <Panel title="This app's records for this account">
+          <FieldRow
+            label="First scanned by this app (account-wide)"
+            field={r.firstObserved}
+            format={(v) => unixToDisplay(Date.parse(v) / 1000)}
+          />
+          <FieldRow
+            label="Last scanned by this app (account-wide)"
+            field={r.lastObserved}
+            format={(v) => unixToDisplay(Date.parse(v) / 1000)}
+          />
+          <FieldRow label="Last known Rust server" field={r.lastKnownServer} />
           <div className="muted small" style={{ marginTop: 8 }}>
-            Rust server-level history requires an authorized BattleMetrics token (experimental) or observations this app
-            has recorded over time. It is never fabricated.
+            "First/last scanned" is the first and last time this app looked up this Steam account for any reason — not
+            when Rust activity began. Rust server-level history requires an authorized BattleMetrics token
+            (experimental) or observations this app records over time, and is never fabricated.
           </div>
         </Panel>
       </div>
