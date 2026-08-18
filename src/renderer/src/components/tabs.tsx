@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { Trash2, Plus, ShieldCheck, ShieldAlert, Ban, HelpCircle } from 'lucide-react'
 import type { GameStat, PlayerReport, TimelineEvent } from '@shared/types'
-import { formatHours, formatNumber, unixToDisplay, minutesToHours } from '@shared/format'
+import { formatHours, formatNumber, unixToDisplay, minutesToHours, relativeTime } from '@shared/format'
+import { buildScanTimeline } from '@shared/scanTimeline'
 import { FieldRow, SourceBadge, CopyButton, useToast } from './ui'
 import type { NoteItem } from '../global'
 
@@ -591,6 +592,69 @@ export function RawTab({ report }: { report: PlayerReport }) {
           </pre>
         </details>
       ))}
+    </Panel>
+  )
+}
+
+// ---------------- Scan history (cross-time timeline) ----------------
+export function ScanHistoryTab({ report }: { report: PlayerReport }) {
+  const steam64 = report.identity.steam64
+  const [steps, setSteps] = useState<ReturnType<typeof buildScanTimeline>>([])
+  const [loaded, setLoaded] = useState(false)
+  useEffect(() => {
+    setLoaded(false)
+    window.api.history.scanTimeline(steam64).then((entries) => {
+      setSteps(buildScanTimeline(entries))
+      setLoaded(true)
+    })
+  }, [steam64])
+  const display = [...steps].reverse()
+  return (
+    <Panel title="Scan history (recorded by this app over time)">
+      <div className="muted small" style={{ marginBottom: 10 }}>
+        Each entry is a scan this app stored, with what changed since the one before it. Only changed scans are kept, so
+        this is a compact history of real changes — never fabricated.
+      </div>
+      {!loaded && <div className="muted small">Loading…</div>}
+      {loaded && steps.length === 0 && (
+        <div className="empty">
+          No scans recorded yet. Analyze this player (or enable background monitoring) and the history builds here.
+        </div>
+      )}
+      <div className="timeline-line">
+        {display.map((s, i) => (
+          <div className="timeline-item" key={s.scannedAt + i}>
+            <div className="timeline-dot" />
+            <div>
+              <div className="row center" style={{ gap: 8 }}>
+                <strong>{relativeTime(s.scannedAt)}</strong>
+                <span className="muted small">{s.scannedAt.split('T')[0]}</span>
+              </div>
+              {s.changes.length === 0 ? (
+                <div className="muted small">
+                  {i === display.length - 1 ? 'First scan recorded' : 'No changes since the previous scan'}
+                </div>
+              ) : (
+                <div className="row wrap" style={{ gap: 6, marginTop: 4 }}>
+                  {s.changes.map((c, j) => (
+                    <span
+                      key={j}
+                      className="tag-chip"
+                      style={
+                        c.kind === 'ban' || c.kind === 'privacy'
+                          ? { borderColor: 'var(--bad)', color: 'var(--bad)' }
+                          : undefined
+                      }
+                    >
+                      {c.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </Panel>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   Search,
   History as HistoryIcon,
@@ -17,6 +17,7 @@ import HistoryPage from './pages/History'
 import Compare from './pages/Compare'
 import BulkScreen from './pages/BulkScreen'
 import Settings from './pages/Settings'
+import { CommandPalette, type Command } from './components/CommandPalette'
 import type { SettingsStatus } from './global'
 
 type View = 'dashboard' | 'history' | 'favorites' | 'compare' | 'bulk' | 'settings'
@@ -56,6 +57,31 @@ export default function App() {
     })
     return off
   }, [])
+
+  // Command palette (Ctrl/Cmd+K).
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setPaletteOpen((o) => !o)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+  const commands = useMemo<Command[]>(
+    () => [
+      { id: 'nav-dashboard', label: 'Go to Player Search', run: () => setView('dashboard') },
+      { id: 'nav-history', label: 'Go to Recent Players', run: () => setView('history') },
+      { id: 'nav-favorites', label: 'Go to Favorites', run: () => setView('favorites') },
+      { id: 'nav-compare', label: 'Go to Compare', run: () => setView('compare') },
+      { id: 'nav-bulk', label: 'Go to Bulk screen', run: () => setView('bulk') },
+      { id: 'nav-settings', label: 'Go to Settings', run: () => setView('settings') },
+      { id: 'toggle-theme', label: 'Toggle light / dark theme', run: toggleTheme }
+    ],
+    [toggleTheme]
+  )
 
   const nav = (v: View, icon: React.ReactNode, label: string) => (
     <button
@@ -118,6 +144,12 @@ export default function App() {
             {view === 'settings' && <Settings status={status} onChange={refreshStatus} />}
           </ErrorBoundary>
         </main>
+        <CommandPalette
+          open={paletteOpen}
+          onClose={() => setPaletteOpen(false)}
+          commands={commands}
+          onAnalyze={analyzeFromElsewhere}
+        />
       </div>
     </ToastProvider>
   )

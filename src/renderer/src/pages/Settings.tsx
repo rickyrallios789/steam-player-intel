@@ -24,12 +24,15 @@ export default function Settings({ status, onChange }: { status: SettingsStatus 
   const [upd, setUpd] = useState<UpdateStatus>({ state: 'idle' })
   const [monitorOn, setMonitorOn] = useState(false)
   const [checking, setChecking] = useState(false)
+  const [webhookUrl, setWebhookUrl] = useState('')
+  const [testing, setTesting] = useState(false)
   const toast = useToast()
 
   useEffect(() => {
     window.api.appInfo().then((i) => setVersion(i.version))
     window.api.updates.current().then(setUpd)
     window.api.monitor.status().then((s) => setMonitorOn(s.enabled))
+    window.api.monitor.getWebhook().then((r) => setWebhookUrl(r.url))
     const off = window.api.updates.onStatus(setUpd)
     return off
   }, [])
@@ -118,6 +121,44 @@ export default function Settings({ status, onChange }: { status: SettingsStatus 
               {monitorOn ? 'Turn off' : 'Turn on'}
             </button>
           </div>
+        </div>
+        <div className="muted small" style={{ marginTop: 12 }}>
+          Optional: also send alerts to a <b>Discord webhook</b> (channel → Edit → Integrations → Webhooks). Stored
+          locally on this device.
+        </div>
+        <div className="row" style={{ gap: 8, marginTop: 6 }}>
+          <input
+            className="text mono"
+            type="url"
+            aria-label="Discord webhook URL"
+            placeholder="https://discord.com/api/webhooks/…"
+            value={webhookUrl}
+            onChange={(e) => setWebhookUrl(e.target.value)}
+          />
+          <button
+            className="btn"
+            onClick={async () => {
+              await window.api.monitor.setWebhook(webhookUrl)
+              toast(webhookUrl.trim() ? 'Webhook saved' : 'Webhook cleared')
+            }}
+          >
+            <Save size={14} /> Save
+          </button>
+          <button
+            className="btn"
+            disabled={testing || !webhookUrl.trim()}
+            onClick={async () => {
+              setTesting(true)
+              try {
+                const r = await window.api.monitor.testWebhook(webhookUrl)
+                toast(r.ok ? 'Test message sent' : `Test failed: ${r.error ?? 'error'}`)
+              } finally {
+                setTesting(false)
+              }
+            }}
+          >
+            {testing ? <Loader2 size={14} className="spin" /> : <BellRing size={14} />} Send test
+          </button>
         </div>
       </div>
 

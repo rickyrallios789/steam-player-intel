@@ -1,5 +1,6 @@
 import type { PlayerReport } from '@shared/types'
 import type { SettingsStatus, AnalyzeResult, HistoryItem, NoteItem, UpdateStatus } from '@shared/ipc'
+import type { ScanTimelineEntry } from '@shared/scanTimeline'
 
 // Re-export the shared IPC types so existing `from '../global'` imports keep working. (audit F-13)
 export type { SettingsStatus, AnalyzeResult, HistoryItem, NoteItem, UpdateStatus }
@@ -15,6 +16,7 @@ export interface RendererApi {
     setFavorite(steam64: string, favorite: boolean): Promise<{ ok: boolean }>
     remove(steam64: string): Promise<{ ok: boolean }>
     clearAll(): Promise<{ ok: boolean }>
+    scanTimeline(steam64: string): Promise<ScanTimelineEntry[]>
   }
   notes: {
     list(steam64: string): Promise<NoteItem[]>
@@ -36,6 +38,9 @@ export interface RendererApi {
     status(): Promise<{ enabled: boolean }>
     setEnabled(enabled: boolean): Promise<{ enabled: boolean }>
     runNow(): Promise<{ checked: number; alerts: number }>
+    getWebhook(): Promise<{ url: string }>
+    setWebhook(url: string): Promise<{ ok: boolean }>
+    testWebhook(url: string): Promise<{ ok: boolean; error?: string }>
     onOpen(cb: (steam64: string) => void): () => void
   }
   openExternal(url: string): Promise<{ ok: boolean }>

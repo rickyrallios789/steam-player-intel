@@ -13,6 +13,7 @@ import type { MonitorService } from './services/monitor'
 import { checkForUpdates, quitAndInstall, getLastStatus } from './updater'
 import { isValidSteam64 } from '../shared/steamid'
 import type { PlayerReport } from '../shared/types'
+import { buildDiscordAlert } from '../shared/webhook'
 
 export interface IpcDeps {
   repos: Repositories
@@ -75,6 +76,9 @@ export function registerIpc(deps: IpcDeps): void {
     deps.repos.clearAllHistory()
     return { ok: true }
   })
+  ipcMain.handle('player:scanHistory', async (_e, p: { steam64: string }) =>
+    deps.repos.getScanTimeline(assertSteam64(p.steam64))
+  )
 
   // ---- Notes (user-entered) ----
   ipcMain.handle('notes:list', async (_e, p: { steam64: string }) => deps.repos.listNotes(assertSteam64(p.steam64)))
@@ -139,6 +143,25 @@ export function registerIpc(deps: IpcDeps): void {
     return { enabled: deps.monitor.isActive }
   })
   ipcMain.handle('monitor:runNow', async () => deps.monitor.runOnce())
+  ipcMain.handle('monitor:getWebhook', async () => ({ url: deps.repos.getSetting('monitor.webhook') ?? '' }))
+  ipcMain.handle('monitor:setWebhook', async (_e, p: { url: string }) => {
+    deps.repos.setSetting('monitor.webhook', assertString(p?.url ?? '', 500).trim())
+    return { ok: true }
+  })
+  ipcMain.handle('monitor:testWebhook', async (_e, p: { url: string }) => {
+    const url = assertString(p?.url ?? '', 500).trim()
+    if (!/^https:\/\//i.test(url)) return { ok: false, error: 'Enter an https webhook URL.' }
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildDiscordAlert('Test', 'Steam Player Intel webhook is working', '76561197960287930'))
+      })
+      return res.ok ? { ok: true } : { ok: false, error: `Webhook returned HTTP ${res.status}` }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : 'Request failed' }
+    }
+  })
 
   // ---- Auto-update ----
   ipcMain.handle('update:check', async () => {

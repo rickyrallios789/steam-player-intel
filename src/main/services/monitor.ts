@@ -15,6 +15,7 @@ import type { Repositories } from '../db/repositories'
 import type { HttpClient } from '../core/httpClient'
 import { analyzePlayer } from './analyzePlayer'
 import { selectAlerts } from '../../shared/monitorAlerts'
+import { buildDiscordAlert } from '../../shared/webhook'
 
 export const MONITOR_INTERVAL_MS = 6 * 60 * 60 * 1000 // every 6 hours
 const FIRST_RUN_DELAY_MS = 60_000 // wait a minute after launch before the first sweep
@@ -69,12 +70,28 @@ export class MonitorService {
         for (const alert of selectAlerts(res.report.changes.entries)) {
           alerts++
           this.notify(name, alert.label, steam64)
+          await this.postWebhook(name, alert.label, steam64)
         }
       }
     } finally {
       this.running = false
     }
     return { checked, alerts }
+  }
+
+  /** Optionally forward an alert to a user-configured Discord (or compatible) webhook. */
+  private async postWebhook(name: string, message: string, steam64: string): Promise<void> {
+    const url = this.deps.repos.getSetting('monitor.webhook')
+    if (!url) return
+    try {
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildDiscordAlert(name, message, steam64))
+      })
+    } catch {
+      /* best-effort — never let a webhook failure break monitoring */
+    }
   }
 
   private notify(name: string, message: string, steam64: string): void {

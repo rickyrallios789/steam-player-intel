@@ -11,6 +11,7 @@ import {
   SecurityTab,
   NamesTab,
   TimelineTab,
+  ScanHistoryTab,
   ProfileTab,
   NotesTab,
   RawTab
@@ -25,6 +26,7 @@ const TABS = [
   'Names',
   'Security',
   'Timeline',
+  'Scan history',
   'Profile',
   'Notes',
   'Raw Data'
@@ -256,6 +258,7 @@ export default function PlayerReportView({
       {tab === 'Names' && <NamesTab report={report} />}
       {tab === 'Security' && <SecurityTab report={report} />}
       {tab === 'Timeline' && <TimelineTab report={report} />}
+      {tab === 'Scan history' && <ScanHistoryTab report={report} />}
       {tab === 'Profile' && <ProfileTab report={report} />}
       {tab === 'Notes' && <NotesTab report={report} />}
       {tab === 'Raw Data' && <RawTab report={report} />}

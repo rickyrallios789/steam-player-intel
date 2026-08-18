@@ -21,7 +21,8 @@ const api = {
     setFavorite: (steam64: string, favorite: boolean) =>
       ipcRenderer.invoke('history:setFavorite', { steam64, favorite }),
     remove: (steam64: string) => ipcRenderer.invoke('history:delete', { steam64 }),
-    clearAll: () => ipcRenderer.invoke('history:clearAll')
+    clearAll: () => ipcRenderer.invoke('history:clearAll'),
+    scanTimeline: (steam64: string) => ipcRenderer.invoke('player:scanHistory', { steam64 })
   },
   notes: {
     list: (steam64: string): Promise<NoteItem[]> => ipcRenderer.invoke('notes:list', { steam64 }),
@@ -50,6 +51,10 @@ const api = {
     setEnabled: (enabled: boolean): Promise<{ enabled: boolean }> =>
       ipcRenderer.invoke('monitor:setEnabled', { enabled }),
     runNow: (): Promise<{ checked: number; alerts: number }> => ipcRenderer.invoke('monitor:runNow'),
+    getWebhook: (): Promise<{ url: string }> => ipcRenderer.invoke('monitor:getWebhook'),
+    setWebhook: (url: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('monitor:setWebhook', { url }),
+    testWebhook: (url: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('monitor:testWebhook', { url }),
     onOpen: (cb: (steam64: string) => void): (() => void) => {
       const listener = (_e: unknown, p: { steam64: string }) => cb(p.steam64)
       ipcRenderer.on('monitor:open', listener)

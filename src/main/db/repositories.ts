@@ -28,6 +28,14 @@ export class Repositories {
       .get(steam64) as ScanRow | undefined
   }
 
+  /** Every stored scan for a player as timeline entries, oldest → newest. (cross-time timeline) */
+  getScanTimeline(steam64: string): Array<{ scannedAt: string; snapshot: PlayerSnapshot }> {
+    const rows = this.db
+      .prepare('SELECT * FROM scans WHERE steam64 = ? ORDER BY scanned_at ASC, id ASC')
+      .all(steam64) as ScanRow[]
+    return rows.map((r) => ({ scannedAt: r.scanned_at, snapshot: this.rowToSnapshot(r) }))
+  }
+
   private rowToSnapshot(r: ScanRow): PlayerSnapshot {
     return {
       displayName: r.display_name,
