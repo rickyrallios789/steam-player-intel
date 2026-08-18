@@ -41,6 +41,15 @@ const PERSONA_COLOR: Record<string, string> = {
   offline: 'var(--text-faint)'
 }
 
+// Third-party lookup sites for cross-referencing a player (they use search boxes,
+// so we copy the Steam ID and open the site rather than deep-linking).
+const LOOKUP_SITES: Array<{ name: string; url: string }> = [
+  { name: 'RustBanned', url: 'https://rustbanned.net/' },
+  { name: 'BanSearch', url: 'https://bansearch.com/' },
+  { name: 'RustWho', url: 'https://www.rustwho.com/' },
+  { name: 'SteamID.uk', url: 'https://steamid.uk/' }
+]
+
 export default function PlayerReportView({
   report,
   onRefresh
@@ -66,6 +75,12 @@ export default function PlayerReportView({
   const vac = report.bans.numberOfVacBans.value
   const gameBans = report.bans.numberOfGameBans.value
   const isStale = report.dataFreshness.some((f) => f.stale)
+
+  const openLookup = (site: { name: string; url: string }): void => {
+    navigator.clipboard.writeText(id.steam64).catch(() => {})
+    window.api.openExternal(site.url)
+    toast(`Steam ID copied — paste it into ${site.name}`)
+  }
 
   return (
     <div>
@@ -165,6 +180,19 @@ export default function PlayerReportView({
                 )}`
             )
             .join('  ·  ')}
+        </div>
+        <div className="row wrap center" style={{ marginTop: 8, gap: 6 }}>
+          <span className="muted small">Cross-check bans on:</span>
+          {LOOKUP_SITES.map((s) => (
+            <button
+              key={s.name}
+              className="btn small ghost"
+              onClick={() => openLookup(s)}
+              title={`Copy this Steam ID and open ${s.name}`}
+            >
+              {s.name} <ExternalLink size={11} />
+            </button>
+          ))}
         </div>
       </div>
 

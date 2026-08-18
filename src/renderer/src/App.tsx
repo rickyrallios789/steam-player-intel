@@ -4,6 +4,7 @@ import {
   History as HistoryIcon,
   Star,
   GitCompare,
+  Users,
   Settings as SettingsIcon,
   Shield,
   Moon,
@@ -14,10 +15,11 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import Dashboard from './pages/Dashboard'
 import HistoryPage from './pages/History'
 import Compare from './pages/Compare'
+import BulkScreen from './pages/BulkScreen'
 import Settings from './pages/Settings'
 import type { SettingsStatus } from './global'
 
-type View = 'dashboard' | 'history' | 'favorites' | 'compare' | 'settings'
+type View = 'dashboard' | 'history' | 'favorites' | 'compare' | 'bulk' | 'settings'
 
 function useTheme(): [string, () => void] {
   const [theme, setTheme] = useState<string>(() => localStorage.getItem('theme') || 'dark')
@@ -85,6 +87,7 @@ export default function App() {
           {nav('history', <HistoryIcon size={17} />, 'Recent Players')}
           {nav('favorites', <Star size={17} />, 'Favorites')}
           {nav('compare', <GitCompare size={17} />, 'Compare')}
+          {nav('bulk', <Users size={17} />, 'Bulk screen')}
           <div className="nav-spacer" />
           {!status?.steamKeySet && (
             <button className="nav-item" style={{ color: 'var(--warn)' }} onClick={() => setView('settings')}>
@@ -111,6 +114,7 @@ export default function App() {
             {view === 'history' && <HistoryPage onAnalyze={analyzeFromElsewhere} favoritesOnly={false} />}
             {view === 'favorites' && <HistoryPage onAnalyze={analyzeFromElsewhere} favoritesOnly={true} />}
             {view === 'compare' && <Compare status={status} />}
+            {view === 'bulk' && <BulkScreen onAnalyze={analyzeFromElsewhere} />}
             {view === 'settings' && <Settings status={status} onChange={refreshStatus} />}
           </ErrorBoundary>
         </main>
