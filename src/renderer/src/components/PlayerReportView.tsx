@@ -84,6 +84,13 @@ export default function PlayerReportView({
     toast(`Steam ID copied — paste it into ${site.name}`)
   }
 
+  // BattleMetrics can't look up Steam IDs on public pages. Link straight to the resolved
+  // profile when the app matched one via a token; otherwise use the RCON player search,
+  // which admins can search by Steam ID. (fixes the "no players matched" bug)
+  const bmUrl = report.battlemetricsPlayerId
+    ? `https://www.battlemetrics.com/players/${report.battlemetricsPlayerId}`
+    : `https://www.battlemetrics.com/rcon/players?filter[search]=${encodeURIComponent('"' + id.steam64 + '"')}`
+
   return (
     <div>
       {/* Header */}
@@ -132,7 +139,12 @@ export default function PlayerReportView({
             </button>
             <button
               className="btn small"
-              onClick={() => window.api.openExternal(`https://www.battlemetrics.com/players?filter[search]=${id.steam64}`)}
+              onClick={() => window.api.openExternal(bmUrl)}
+              title={
+                report.battlemetricsPlayerId
+                  ? 'Open this player on BattleMetrics'
+                  : 'Find this Steam ID on BattleMetrics (requires being logged in as a server admin / RCON)'
+              }
             >
               BattleMetrics <ExternalLink size={12} />
             </button>

@@ -403,6 +403,7 @@ export async function analyzePlayer(
     issues,
     sourcesUsed,
     dataFreshness,
+    battlemetricsPlayerId: bmCap.data?.playerId ?? null,
     generatedAt: new Date().toISOString(),
     raw
   }

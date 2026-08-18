@@ -74,6 +74,8 @@ export interface SecurityData {
 
 export interface ServerHistoryData {
   servers: ServerObservation[]
+  /** BattleMetrics player id when the Steam ID was resolved via the authorized match endpoint. */
+  playerId?: string | null
 }
 
 export interface NameHistoryData {

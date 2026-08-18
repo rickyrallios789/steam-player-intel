@@ -116,7 +116,7 @@ export class BattleMetricsProvider implements DataProvider {
     const url = `${BASE}/players/${playerId}?include=server`
     const res = await this.authedGetJson<BmPlayerResponse>(url, token)
     if (!res.ok || !res.data) {
-      return { data: { servers: [] }, source: 'battlemetrics', issue: issue(this.name, 'bm_unavailable') }
+      return { data: { servers: [], playerId }, source: 'battlemetrics', issue: issue(this.name, 'bm_unavailable') }
     }
 
     const servers: ServerObservation[] = (res.data.included ?? [])
@@ -138,6 +138,6 @@ export class BattleMetricsProvider implements DataProvider {
         }
       })
 
-    return { data: { servers }, source: 'battlemetrics', raw: res.data }
+    return { data: { servers, playerId }, source: 'battlemetrics', raw: res.data }
   }
 }
