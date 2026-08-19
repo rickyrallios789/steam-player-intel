@@ -6,7 +6,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { PlayerReport } from '../shared/types'
 // IPC contract types now live once in src/shared/ipc.ts. (audit F-13)
-import type { SettingsStatus, AnalyzeResult, HistoryItem, NoteItem, UpdateStatus } from '../shared/ipc'
+import type { SettingsStatus, AnalyzeResult, HistoryItem, NoteItem, UpdateStatus, RosterRow } from '../shared/ipc'
 
 const api = {
   settings: {
@@ -23,6 +23,16 @@ const api = {
     remove: (steam64: string) => ipcRenderer.invoke('history:delete', { steam64 }),
     clearAll: () => ipcRenderer.invoke('history:clearAll'),
     scanTimeline: (steam64: string) => ipcRenderer.invoke('player:scanHistory', { steam64 })
+  },
+  rosters: {
+    list: (): Promise<RosterRow[]> => ipcRenderer.invoke('rosters:list'),
+    create: (name: string, members: string): Promise<RosterRow> =>
+      ipcRenderer.invoke('rosters:create', { name, members }),
+    update: (
+      id: number,
+      patch: { name?: string; members?: string; intervalHours?: number }
+    ): Promise<{ ok: boolean }> => ipcRenderer.invoke('rosters:update', { id, ...patch }),
+    remove: (id: number): Promise<{ ok: boolean }> => ipcRenderer.invoke('rosters:delete', { id })
   },
   notes: {
     list: (steam64: string): Promise<NoteItem[]> => ipcRenderer.invoke('notes:list', { steam64 }),

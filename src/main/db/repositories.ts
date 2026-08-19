@@ -4,6 +4,7 @@
  */
 import type { AppDatabase, NoteRow, PlayerRow, ScanRow } from './database'
 import type { PlayerSnapshot } from '../../shared/changeDetection'
+import type { RosterRow } from '../../shared/ipc'
 
 export interface HistoryRecord {
   player: PlayerRow
@@ -276,5 +277,29 @@ export class Repositories {
     return (this.db.prepare('SELECT tag FROM tags WHERE steam64 = ?').all(steam64) as { tag: string }[]).map(
       (t) => t.tag
     )
+  }
+
+  // ---- Rosters (saved lists of players to screen together) ----
+  listRosters(): RosterRow[] {
+    return this.db.prepare('SELECT * FROM rosters ORDER BY name COLLATE NOCASE ASC').all() as RosterRow[]
+  }
+
+  createRoster(name: string, members: string): RosterRow {
+    const info = this.db
+      .prepare('INSERT INTO rosters (name, members, interval_hours, last_run, created_at) VALUES (?, ?, 0, NULL, ?)')
+      .run(name, members, new Date().toISOString())
+    return this.db.prepare('SELECT * FROM rosters WHERE id = ?').get(info.lastInsertRowid) as RosterRow
+  }
+
+  updateRoster(id: number, patch: { name?: string; members?: string; intervalHours?: number }): void {
+    const cur = this.db.prepare('SELECT * FROM rosters WHERE id = ?').get(id) as RosterRow | undefined
+    if (!cur) return
+    this.db
+      .prepare('UPDATE rosters SET name = ?, members = ?, interval_hours = ? WHERE id = ?')
+      .run(patch.name ?? cur.name, patch.members ?? cur.members, patch.intervalHours ?? cur.interval_hours, id)
+  }
+
+  deleteRoster(id: number): void {
+    this.db.prepare('DELETE FROM rosters WHERE id = ?').run(id)
   }
 }

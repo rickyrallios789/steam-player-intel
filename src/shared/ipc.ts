@@ -37,6 +37,17 @@ export interface NoteItem {
   created_at: string
 }
 
+export interface RosterRow {
+  id: number
+  name: string
+  /** Newline/comma/space-separated raw Steam identifiers pasted by the user. */
+  members: string
+  /** Background re-screen cadence in hours; 0 = manual only. */
+  interval_hours: number
+  last_run: string | null
+  created_at: string
+}
+
 export type UpdateStatus =
   | { state: 'idle' }
   | { state: 'dev'; message: string }

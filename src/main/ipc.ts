@@ -80,6 +80,29 @@ export function registerIpc(deps: IpcDeps): void {
     deps.repos.getScanTimeline(assertSteam64(p.steam64))
   )
 
+  // ---- Rosters (saved lists) ----
+  ipcMain.handle('rosters:list', async () => deps.repos.listRosters())
+  ipcMain.handle('rosters:create', async (_e, p: { name: string; members: string }) =>
+    deps.repos.createRoster(assertString(p?.name ?? 'Untitled roster', 100), assertString(p?.members ?? '', 20000))
+  )
+  ipcMain.handle(
+    'rosters:update',
+    async (_e, p: { id: number; name?: string; members?: string; intervalHours?: number }) => {
+      if (typeof p?.id !== 'number') throw new Error('Invalid roster id.')
+      deps.repos.updateRoster(p.id, {
+        name: p.name != null ? assertString(p.name, 100) : undefined,
+        members: p.members != null ? assertString(p.members, 20000) : undefined,
+        intervalHours: typeof p.intervalHours === 'number' ? p.intervalHours : undefined
+      })
+      return { ok: true }
+    }
+  )
+  ipcMain.handle('rosters:delete', async (_e, p: { id: number }) => {
+    if (typeof p?.id !== 'number') throw new Error('Invalid roster id.')
+    deps.repos.deleteRoster(p.id)
+    return { ok: true }
+  })
+
   // ---- Notes (user-entered) ----
   ipcMain.handle('notes:list', async (_e, p: { steam64: string }) => deps.repos.listNotes(assertSteam64(p.steam64)))
   ipcMain.handle('notes:add', async (_e, p: { steam64: string; body: string }) =>

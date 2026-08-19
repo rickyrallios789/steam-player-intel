@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Play, Square, Copy, Loader2, AlertCircle, ExternalLink } from 'lucide-react'
 import { parseRosterInput } from '@shared/roster'
 import { csvField } from '@shared/csv'
@@ -41,7 +41,15 @@ function summarize(r: PlayerReport): Partial<Row> {
 
 type SortKey = 'name' | 'ageDays' | 'vac' | 'gameBans' | 'rustHours' | 'changes'
 
-export default function BulkScreen({ onAnalyze }: { onAnalyze: (steam64: string) => void }) {
+export default function BulkScreen({
+  onAnalyze,
+  initialText,
+  onConsumeInitial
+}: {
+  onAnalyze: (steam64: string) => void
+  initialText?: string | null
+  onConsumeInitial?: () => void
+}) {
   const [text, setText] = useState('')
   const [rows, setRows] = useState<Row[]>([])
   const [running, setRunning] = useState(false)
@@ -53,8 +61,8 @@ export default function BulkScreen({ onAnalyze }: { onAnalyze: (steam64: string)
   const ids = useMemo(() => parseRosterInput(text), [text])
   const overCap = ids.length > MAX_ROSTER
 
-  const run = async (): Promise<void> => {
-    const list = parseRosterInput(text).slice(0, MAX_ROSTER)
+  const run = async (sourceText?: string): Promise<void> => {
+    const list = parseRosterInput(sourceText ?? text).slice(0, MAX_ROSTER)
     if (!list.length) return
     cancelRef.current = false
     setRunning(true)
@@ -88,6 +96,15 @@ export default function BulkScreen({ onAnalyze }: { onAnalyze: (steam64: string)
   const stop = (): void => {
     cancelRef.current = true
   }
+
+  // When arriving from "Screen now" on a saved roster, preload the members and run once.
+  useEffect(() => {
+    if (initialText == null) return
+    setText(initialText)
+    void run(initialText)
+    onConsumeInitial?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialText])
 
   const copyCsv = (): void => {
     const header = ['steam64', 'name', 'age_days', 'vac_bans', 'game_bans', 'community_banned', 'visibility', 'rust_hours', 'changes']
@@ -168,7 +185,7 @@ export default function BulkScreen({ onAnalyze }: { onAnalyze: (steam64: string)
                 <Square size={14} /> Stop
               </button>
             ) : (
-              <button className="btn primary" onClick={run} disabled={!ids.length}>
+              <button className="btn primary" onClick={() => run()} disabled={!ids.length}>
                 <Play size={14} /> Scan {Math.min(ids.length, MAX_ROSTER) || ''} {ids.length === 1 ? 'player' : 'players'}
               </button>
             )}

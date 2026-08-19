@@ -116,6 +116,15 @@ CREATE TABLE IF NOT EXISTS app_settings (
   key   TEXT PRIMARY KEY,
   value TEXT
 );
+
+CREATE TABLE IF NOT EXISTS rosters (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  name           TEXT NOT NULL,
+  members        TEXT NOT NULL DEFAULT '',
+  interval_hours INTEGER NOT NULL DEFAULT 0,
+  last_run       TEXT,
+  created_at     TEXT NOT NULL
+);
 `
 
 export class AppDatabase {
