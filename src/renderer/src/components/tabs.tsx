@@ -6,6 +6,7 @@ import { formatHours, formatNumber, unixToDisplay, minutesToHours, relativeTime 
 import { buildScanTimeline } from '@shared/scanTimeline'
 import { buildRustActivityTrend } from '@shared/rustActivity'
 import { FieldRow, SourceBadge, CopyButton, useToast } from './ui'
+import { VirtualTable } from './VirtualTable'
 import type { NoteItem } from '../global'
 
 function Panel({ title, children, style }: { title?: string; children: React.ReactNode; style?: React.CSSProperties }) {
@@ -100,6 +101,23 @@ export function GamesTab({ report, recentOnly }: { report: PlayerReport; recentO
     hours: minutesToHours(g.playtimeForeverMinutes, 0)
   }))
 
+  const gamesHeader = (
+    <tr>
+      <th scope="col" onClick={() => setSort('name')} title="Sort by name">
+        Game
+      </th>
+      <th scope="col" onClick={() => setSort('hours')} style={{ textAlign: 'right' }} title="Sort by total hours">
+        Total hours
+      </th>
+      <th scope="col" onClick={() => setSort('recent')} style={{ textAlign: 'right' }} title="Sort by recent">
+        Last 2 weeks
+      </th>
+      <th scope="col" style={{ textAlign: 'right' }}>
+        Last played
+      </th>
+    </tr>
+  )
+
   if (priv && !recentOnly) {
     return (
       <Panel>
@@ -148,29 +166,26 @@ export function GamesTab({ report, recentOnly }: { report: PlayerReport; recentO
       )}
 
       <Panel title={recentOnly ? 'Recent activity (last 2 weeks)' : `All games (${games.length})`}>
-        <table className="data">
-          <thead>
-            <tr>
-              <th scope="col" onClick={() => setSort('name')} title="Sort by name">
-                Game
-              </th>
-              <th scope="col" onClick={() => setSort('hours')} style={{ textAlign: 'right' }} title="Sort by total hours">
-                Total hours
-              </th>
-              <th scope="col" onClick={() => setSort('recent')} style={{ textAlign: 'right' }} title="Sort by recent">
-                Last 2 weeks
-              </th>
-              <th scope="col" style={{ textAlign: 'right' }}>
-                Last played
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.slice(0, 300).map((g) => (
-              <GameRow key={g.appId} g={g} />
-            ))}
-          </tbody>
-        </table>
+        {recentOnly ? (
+          <table className="data">
+            <thead>{gamesHeader}</thead>
+            <tbody>
+              {sorted.map((g) => (
+                <GameRow key={g.appId} g={g} />
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          // Windowed so libraries with thousands of games stay smooth (no row cap). (v0.8.1)
+          <VirtualTable
+            items={sorted}
+            rowHeight={41}
+            maxHeight={560}
+            columnCount={4}
+            header={gamesHeader}
+            renderRow={(g) => <GameRow key={g.appId} g={g} />}
+          />
+        )}
       </Panel>
     </div>
   )
