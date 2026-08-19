@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { Trash2, Plus, ShieldCheck, ShieldAlert, Ban, HelpCircle, ExternalLink } from 'lucide-react'
 import type { GameStat, PlayerReport, TimelineEvent } from '@shared/types'
 import { formatHours, formatNumber, unixToDisplay, minutesToHours, relativeTime } from '@shared/format'
 import { buildScanTimeline } from '@shared/scanTimeline'
+import { buildRustActivityTrend } from '@shared/rustActivity'
 import { FieldRow, SourceBadge, CopyButton, useToast } from './ui'
 import type { NoteItem } from '../global'
 
@@ -255,7 +256,54 @@ export function RustTab({ report }: { report: PlayerReport }) {
           </div>
         </Panel>
       </div>
+
+      <RustActivityPanel steam64={report.identity.steam64} />
     </div>
+  )
+}
+
+/** Rust cumulative-hours trend built from this app's own stored scans. (v0.6.1) */
+function RustActivityPanel({ steam64 }: { steam64: string }) {
+  const [trend, setTrend] = useState<ReturnType<typeof buildRustActivityTrend> | null>(null)
+  const [loaded, setLoaded] = useState(false)
+  useEffect(() => {
+    setLoaded(false)
+    window.api.history.scanTimeline(steam64).then((entries) => {
+      setTrend(buildRustActivityTrend(entries))
+      setLoaded(true)
+    })
+  }, [steam64])
+
+  const data = (trend?.points ?? []).map((p) => ({ date: p.scannedAt.split('T')[0], hours: p.rustHours }))
+
+  return (
+    <Panel title="Rust playtime over time (recorded by this app)">
+      <div className="muted small" style={{ marginBottom: 10 }}>
+        Cumulative Rust hours as captured across this app’s scans of this account — built only from real stored scans,
+        never interpolated or fabricated.
+        {trend?.gainedHours != null && ` +${formatNumber(trend.gainedHours)}h across the recorded window.`}
+      </div>
+      {!loaded ? (
+        <div className="muted small">Loading…</div>
+      ) : data.length < 2 ? (
+        <div className="empty">
+          Not enough recorded scans yet to chart a trend. Each analyze of this player (or a background monitor / roster
+          re-screen) adds a point here.
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={220}>
+          <LineChart data={data} margin={{ left: 10, right: 16, top: 8 }}>
+            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#8592a6' }} />
+            <YAxis tick={{ fontSize: 11, fill: '#8592a6' }} width={44} />
+            <Tooltip
+              contentStyle={{ background: '#141c2b', border: '1px solid #22304a', borderRadius: 8, color: '#e8eef7' }}
+              formatter={(v: number) => [`${formatNumber(v)}h`, 'Rust hours']}
+            />
+            <Line type="monotone" dataKey="hours" stroke="#ce422b" strokeWidth={2} dot={{ r: 3 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
+    </Panel>
   )
 }
 
