@@ -5,6 +5,7 @@
 import type { AppDatabase, NoteRow, PlayerRow, ScanRow } from './database'
 import type { PlayerSnapshot } from '../../shared/changeDetection'
 import type { RosterRow } from '../../shared/ipc'
+import { BACKUP_VERSION, type BackupData, type ImportSummary } from '../../shared/backup'
 
 export interface HistoryRecord {
   player: PlayerRow
@@ -306,5 +307,144 @@ export class Repositories {
   /** Stamp a roster's last scheduled re-screen time (used by the roster scheduler). */
   markRosterRun(id: number, whenIso = new Date().toISOString()): void {
     this.db.prepare('UPDATE rosters SET last_run = ? WHERE id = ?').run(whenIso, id)
+  }
+
+  // ---- Backup / restore (local-first data portability) — (v0.8.0) ----
+  /** A portable JSON snapshot of the app's observation history. Excludes the HTTP cache and credentials. */
+  exportBackup(): BackupData {
+    const all = (table: string): Record<string, unknown>[] =>
+      this.db.prepare(`SELECT * FROM ${table}`).all() as Record<string, unknown>[]
+    return {
+      version: BACKUP_VERSION,
+      exportedAt: new Date().toISOString(),
+      players: all('players'),
+      scans: all('scans'),
+      names: all('name_observations'),
+      servers: all('server_observations'),
+      notes: all('notes'),
+      tags: all('tags'),
+      settings: all('app_settings'),
+      rosters: all('rosters')
+    }
+  }
+
+  /** Merge a validated backup into the local DB. Adds missing rows; never clobbers existing data. */
+  importBackup(data: BackupData): ImportSummary {
+    const summary: ImportSummary = { players: 0, scans: 0, notes: 0, rosters: 0 }
+    const s = (v: unknown, fallback = ''): string => (v == null ? fallback : String(v))
+    const nOrNull = (v: unknown): number | null => (v == null ? null : Number(v))
+    const sOrNull = (v: unknown): string | null => (v == null ? null : String(v))
+
+    const tx = this.db.transaction(() => {
+      const insPlayer = this.db.prepare(
+        'INSERT OR IGNORE INTO players (steam64, first_observed, last_observed, scan_count, favorite, display_name) VALUES (?, ?, ?, ?, ?, ?)'
+      )
+      for (const p of data.players) {
+        if (!s(p.steam64)) continue
+        const info = insPlayer.run(
+          s(p.steam64),
+          s(p.first_observed, new Date().toISOString()),
+          s(p.last_observed, new Date().toISOString()),
+          Number(p.scan_count ?? 0),
+          Number(p.favorite ?? 0),
+          sOrNull(p.display_name)
+        )
+        if (info.changes > 0) summary.players++
+      }
+
+      const scanExists = this.db.prepare('SELECT 1 FROM scans WHERE steam64 = ? AND scanned_at = ? LIMIT 1')
+      const insScan = this.db.prepare(
+        `INSERT INTO scans (steam64, scanned_at, display_name, avatar_hash, steam_level, game_count,
+          total_playtime_min, rust_playtime_min, vac_bans, game_bans, community_banned, visibility)
+         VALUES (@steam64, @scanned_at, @display_name, @avatar_hash, @steam_level, @game_count,
+          @total_playtime_min, @rust_playtime_min, @vac_bans, @game_bans, @community_banned, @visibility)`
+      )
+      for (const sc of data.scans) {
+        const steam64 = s(sc.steam64)
+        const scanned_at = s(sc.scanned_at)
+        if (!steam64 || !scanned_at) continue
+        if (!this.db.prepare('SELECT 1 FROM players WHERE steam64 = ? LIMIT 1').get(steam64)) continue // FK safety
+        if (scanExists.get(steam64, scanned_at)) continue
+        insScan.run({
+          steam64,
+          scanned_at,
+          display_name: sOrNull(sc.display_name),
+          avatar_hash: sOrNull(sc.avatar_hash),
+          steam_level: nOrNull(sc.steam_level),
+          game_count: nOrNull(sc.game_count),
+          total_playtime_min: nOrNull(sc.total_playtime_min),
+          rust_playtime_min: nOrNull(sc.rust_playtime_min),
+          vac_bans: nOrNull(sc.vac_bans),
+          game_bans: nOrNull(sc.game_bans),
+          community_banned: nOrNull(sc.community_banned),
+          visibility: sOrNull(sc.visibility)
+        })
+        summary.scans++
+      }
+
+      const insName = this.db.prepare(
+        'INSERT OR IGNORE INTO name_observations (steam64, name, first_seen, last_seen) VALUES (?, ?, ?, ?)'
+      )
+      for (const n of data.names) {
+        if (!s(n.steam64) || !s(n.name)) continue
+        insName.run(s(n.steam64), s(n.name), s(n.first_seen), s(n.last_seen))
+      }
+
+      const insServer = this.db.prepare(
+        `INSERT OR IGNORE INTO server_observations (steam64, server_id, server_name, game, region, first_seen, last_seen, observations)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      for (const sv of data.servers) {
+        if (!s(sv.steam64) || !s(sv.server_name)) continue
+        insServer.run(
+          s(sv.steam64),
+          sOrNull(sv.server_id),
+          s(sv.server_name),
+          sOrNull(sv.game),
+          sOrNull(sv.region),
+          s(sv.first_seen),
+          s(sv.last_seen),
+          Number(sv.observations ?? 1)
+        )
+      }
+
+      const noteExists = this.db.prepare('SELECT 1 FROM notes WHERE steam64 = ? AND body = ? AND created_at = ? LIMIT 1')
+      const insNote = this.db.prepare('INSERT INTO notes (steam64, body, created_at) VALUES (?, ?, ?)')
+      for (const nt of data.notes) {
+        const steam64 = s(nt.steam64)
+        const body = s(nt.body)
+        const created_at = s(nt.created_at, new Date().toISOString())
+        if (!steam64 || !body) continue
+        if (noteExists.get(steam64, body, created_at)) continue
+        insNote.run(steam64, body, created_at)
+        summary.notes++
+      }
+
+      const insTag = this.db.prepare('INSERT OR IGNORE INTO tags (steam64, tag) VALUES (?, ?)')
+      for (const tg of data.tags) {
+        if (!s(tg.steam64) || !s(tg.tag)) continue
+        insTag.run(s(tg.steam64), s(tg.tag))
+      }
+
+      const insSetting = this.db.prepare('INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)')
+      for (const st of data.settings) {
+        if (!s(st.key)) continue
+        insSetting.run(s(st.key), sOrNull(st.value))
+      }
+
+      const rosterExists = this.db.prepare('SELECT 1 FROM rosters WHERE name = ? LIMIT 1')
+      const insRoster = this.db.prepare(
+        'INSERT INTO rosters (name, members, interval_hours, last_run, created_at) VALUES (?, ?, ?, ?, ?)'
+      )
+      for (const r of data.rosters) {
+        const name = s(r.name)
+        if (!name) continue
+        if (rosterExists.get(name)) continue
+        insRoster.run(name, s(r.members), Number(r.interval_hours ?? 0), sOrNull(r.last_run), s(r.created_at, new Date().toISOString()))
+        summary.rosters++
+      }
+    })
+    tx()
+    return summary
   }
 }

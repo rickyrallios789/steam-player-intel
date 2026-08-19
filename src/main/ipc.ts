@@ -4,6 +4,7 @@
  * Handlers never return raw API errors; they return friendly, structured results.
  */
 import { ipcMain, dialog, shell, app } from 'electron'
+import { promises as fs } from 'node:fs'
 import type { CredentialName, CredentialStore } from './credentials'
 import type { Repositories } from './db/repositories'
 import type { HttpClient } from './core/httpClient'
@@ -15,6 +16,7 @@ import { isValidSteam64 } from '../shared/steamid'
 import type { PlayerReport } from '../shared/types'
 import { buildDiscordAlert } from '../shared/webhook'
 import { buildActivityFeed, type PlayerTimeline } from '../shared/activityFeed'
+import { validateBackup } from '../shared/backup'
 
 export interface IpcDeps {
   repos: Repositories
@@ -179,6 +181,34 @@ export function registerIpc(deps: IpcDeps): void {
   )
 
   ipcMain.handle('app:info', async () => ({ version: app.getVersion(), name: app.getName() }))
+
+  // ---- Backup / restore (local-first data portability) — (v0.8.0) ----
+  ipcMain.handle('backup:export', async () => {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: 'Export backup',
+      defaultPath: `steam-player-intel-backup-${new Date().toISOString().slice(0, 10)}.json`,
+      filters: [{ name: 'JSON backup', extensions: ['json'] }]
+    })
+    if (canceled || !filePath) return { ok: false, canceled: true }
+    await fs.writeFile(filePath, JSON.stringify(deps.repos.exportBackup(), null, 2), 'utf8')
+    return { ok: true, filePath }
+  })
+
+  ipcMain.handle('backup:import', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: 'Import backup',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON backup', extensions: ['json'] }]
+    })
+    if (canceled || !filePaths?.[0]) return { ok: false, canceled: true }
+    try {
+      const text = await fs.readFile(filePaths[0], 'utf8')
+      const data = validateBackup(JSON.parse(text))
+      return { ok: true, summary: deps.repos.importBackup(data) }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : 'Import failed.' }
+    }
+  })
 
   // ---- Watchlist monitoring ----
   ipcMain.handle('monitor:status', async () => ({ enabled: deps.monitor.isActive }))

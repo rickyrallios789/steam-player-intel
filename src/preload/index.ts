@@ -37,6 +37,16 @@ const api = {
   home: {
     overview: (): Promise<HomeOverview> => ipcRenderer.invoke('home:overview')
   },
+  backup: {
+    export: (): Promise<{ ok: boolean; filePath?: string; canceled?: boolean }> =>
+      ipcRenderer.invoke('backup:export'),
+    import: (): Promise<{
+      ok: boolean
+      canceled?: boolean
+      error?: string
+      summary?: { players: number; scans: number; notes: number; rosters: number }
+    }> => ipcRenderer.invoke('backup:import')
+  },
   rosters: {
     list: (): Promise<RosterRow[]> => ipcRenderer.invoke('rosters:list'),
     create: (name: string, members: string): Promise<RosterRow> =>

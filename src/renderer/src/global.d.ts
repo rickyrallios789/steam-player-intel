@@ -32,6 +32,15 @@ export interface RendererApi {
   home: {
     overview(): Promise<HomeOverview>
   }
+  backup: {
+    export(): Promise<{ ok: boolean; filePath?: string; canceled?: boolean }>
+    import(): Promise<{
+      ok: boolean
+      canceled?: boolean
+      error?: string
+      summary?: { players: number; scans: number; notes: number; rosters: number }
+    }>
+  }
   rosters: {
     list(): Promise<RosterRow[]>
     create(name: string, members: string): Promise<RosterRow>

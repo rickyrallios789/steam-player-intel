@@ -12,7 +12,9 @@ import {
   ExternalLink,
   BellRing,
   BellOff,
-  RefreshCw
+  RefreshCw,
+  Download,
+  Upload
 } from 'lucide-react'
 import { useToast } from '../components/ui'
 import type { SettingsStatus, UpdateStatus } from '../global'
@@ -26,7 +28,35 @@ export default function Settings({ status, onChange }: { status: SettingsStatus 
   const [checking, setChecking] = useState(false)
   const [webhookUrl, setWebhookUrl] = useState('')
   const [testing, setTesting] = useState(false)
+  const [backing, setBacking] = useState(false)
+  const [restoring, setRestoring] = useState(false)
   const toast = useToast()
+
+  const doExportBackup = async (): Promise<void> => {
+    setBacking(true)
+    try {
+      const r = await window.api.backup.export()
+      if (r.ok) toast('Backup saved')
+      else if (!r.canceled) toast('Backup failed')
+    } finally {
+      setBacking(false)
+    }
+  }
+
+  const doImportBackup = async (): Promise<void> => {
+    setRestoring(true)
+    try {
+      const r = await window.api.backup.import()
+      if (r.ok && r.summary) {
+        const s = r.summary
+        toast(`Imported ${s.players} players, ${s.scans} scans, ${s.notes} notes, ${s.rosters} rosters`)
+        onChange()
+      } else if (r.error) toast(`Import failed: ${r.error}`)
+      else if (!r.canceled) toast('Import failed')
+    } finally {
+      setRestoring(false)
+    }
+  }
 
   useEffect(() => {
     window.api.appInfo().then((i) => setVersion(i.version))
@@ -256,6 +286,23 @@ export default function Settings({ status, onChange }: { status: SettingsStatus 
               <Trash2 size={14} /> Clear
             </button>
           )}
+        </div>
+      </div>
+
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <div className="section-title">Backup & restore</div>
+        <p className="muted small" style={{ marginTop: 0 }}>
+          Save a portable copy of your local history — players, scans, notes, tags and saved rosters — to a JSON file,
+          or merge one back in on another machine. Backups <b>never include your API keys</b>, and importing only adds
+          missing data: it never overwrites what you already have.
+        </p>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn" onClick={doExportBackup} disabled={backing}>
+            {backing ? <Loader2 size={14} className="spin" /> : <Download size={14} />} Export backup
+          </button>
+          <button className="btn" onClick={doImportBackup} disabled={restoring}>
+            {restoring ? <Loader2 size={14} className="spin" /> : <Upload size={14} />} Import backup
+          </button>
         </div>
       </div>
 
