@@ -21,6 +21,7 @@ import { registerIpc } from './ipc'
 import { loadEnvFile } from './env'
 import { initUpdater, checkForUpdates } from './updater'
 import { MonitorService } from './services/monitor'
+import { installAppMenu, installContextMenu } from './menu'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -33,6 +34,7 @@ function createWindow(): void {
     show: false,
     backgroundColor: '#0b0f17',
     title: 'Steam Player Intel',
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -41,6 +43,8 @@ function createWindow(): void {
       webSecurity: true
     }
   })
+
+  installContextMenu(mainWindow)
 
   mainWindow.on('ready-to-show', () => mainWindow?.show())
 
@@ -100,6 +104,7 @@ if (!app.requestSingleInstanceLock()) {
 
     registerIpc({ repos, credentials, http: httpClient, monitor, openExternal: (u) => shell.openExternal(u) })
 
+    installAppMenu()
     createWindow()
 
     // Auto-update: only meaningful in the packaged app. Check shortly after launch.
