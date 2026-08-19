@@ -1,9 +1,17 @@
 import type { PlayerReport } from '@shared/types'
-import type { SettingsStatus, AnalyzeResult, HistoryItem, NoteItem, UpdateStatus, RosterRow } from '@shared/ipc'
+import type {
+  SettingsStatus,
+  AnalyzeResult,
+  HistoryItem,
+  NoteItem,
+  UpdateStatus,
+  RosterRow,
+  HomeOverview
+} from '@shared/ipc'
 import type { ScanTimelineEntry } from '@shared/scanTimeline'
 
 // Re-export the shared IPC types so existing `from '../global'` imports keep working. (audit F-13)
-export type { SettingsStatus, AnalyzeResult, HistoryItem, NoteItem, UpdateStatus, RosterRow }
+export type { SettingsStatus, AnalyzeResult, HistoryItem, NoteItem, UpdateStatus, RosterRow, HomeOverview }
 
 export interface RendererApi {
   settings: {
@@ -20,6 +28,9 @@ export interface RendererApi {
     remove(steam64: string): Promise<{ ok: boolean }>
     clearAll(): Promise<{ ok: boolean }>
     scanTimeline(steam64: string): Promise<ScanTimelineEntry[]>
+  }
+  home: {
+    overview(): Promise<HomeOverview>
   }
   rosters: {
     list(): Promise<RosterRow[]>

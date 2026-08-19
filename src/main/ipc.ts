@@ -14,6 +14,7 @@ import { checkForUpdates, quitAndInstall, getLastStatus } from './updater'
 import { isValidSteam64 } from '../shared/steamid'
 import type { PlayerReport } from '../shared/types'
 import { buildDiscordAlert } from '../shared/webhook'
+import { buildActivityFeed, type PlayerTimeline } from '../shared/activityFeed'
 
 export interface IpcDeps {
   repos: Repositories
@@ -84,6 +85,24 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle('player:scanHistory', async (_e, p: { steam64: string }) =>
     deps.repos.getScanTimeline(assertSteam64(p.steam64))
   )
+
+  // ---- Command-center home overview (stats + cross-player activity feed) ----
+  ipcMain.handle('home:overview', async () => {
+    const players = deps.repos.listPlayers()
+    const timelines: PlayerTimeline[] = players
+      .filter((p) => p.scan_count >= 2)
+      .map((p) => ({
+        steam64: p.steam64,
+        displayName: p.display_name,
+        entries: deps.repos.getScanTimeline(p.steam64)
+      }))
+    return {
+      trackedPlayers: players.length,
+      favorites: players.filter((p) => p.favorite).length,
+      totalScans: players.reduce((n, p) => n + (p.scan_count ?? 0), 0),
+      events: buildActivityFeed(timelines, 60)
+    }
+  })
 
   // ---- Rosters (saved lists) ----
   ipcMain.handle('rosters:list', async () => deps.repos.listRosters())

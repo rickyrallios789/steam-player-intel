@@ -5,6 +5,7 @@
  * which allowed them to drift. Define once here and import everywhere. (audit F-13)
  */
 import type { PlayerReport } from './types'
+import type { ActivityEvent } from './activityFeed'
 
 export interface SettingsStatus {
   steamKeySet: boolean
@@ -35,6 +36,14 @@ export interface NoteItem {
   steam64: string
   body: string
   created_at: string
+}
+
+export interface HomeOverview {
+  trackedPlayers: number
+  favorites: number
+  totalScans: number
+  /** Most recent cross-player changes, newest first. */
+  events: ActivityEvent[]
 }
 
 export interface RosterRow {
