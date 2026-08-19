@@ -6,6 +6,7 @@
  */
 import type { PlayerReport } from './types'
 import type { ActivityEvent } from './activityFeed'
+import type { AltLead } from './altLeads'
 
 export interface SettingsStatus {
   steamKeySet: boolean
@@ -44,6 +45,13 @@ export interface HomeOverview {
   totalScans: number
   /** Most recent cross-player changes, newest first. */
   events: ActivityEvent[]
+}
+
+export interface ConnectionsResult {
+  /** How many scanned accounts were considered. */
+  players: number
+  /** Possible connections to review (leads, never proof), strongest first. */
+  leads: AltLead[]
 }
 
 export interface RosterRow {

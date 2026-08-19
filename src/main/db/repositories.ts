@@ -6,6 +6,7 @@ import type { AppDatabase, NoteRow, PlayerRow, ScanRow } from './database'
 import type { PlayerSnapshot } from '../../shared/changeDetection'
 import type { RosterRow } from '../../shared/ipc'
 import { BACKUP_VERSION, type BackupData, type ImportSummary } from '../../shared/backup'
+import type { CorrelationPlayer } from '../../shared/altLeads'
 
 export interface HistoryRecord {
   player: PlayerRow
@@ -446,5 +447,45 @@ export class Repositories {
     })
     tx()
     return summary
+  }
+
+  // ---- Alt-account correlation data (all local) — (v0.10.0) ----
+  /** Assemble every scanned account with its known names and observed avatar hashes. */
+  getCorrelationData(): CorrelationPlayer[] {
+    const players = this.db.prepare('SELECT steam64, display_name FROM players').all() as {
+      steam64: string
+      display_name: string | null
+    }[]
+    const nameRows = this.db.prepare('SELECT steam64, name FROM name_observations').all() as {
+      steam64: string
+      name: string
+    }[]
+    const avatarRows = this.db
+      .prepare('SELECT DISTINCT steam64, avatar_hash FROM scans WHERE avatar_hash IS NOT NULL')
+      .all() as { steam64: string; avatar_hash: string }[]
+
+    const namesBy = new Map<string, Set<string>>()
+    for (const r of nameRows) {
+      const set = namesBy.get(r.steam64) ?? new Set<string>()
+      if (r.name) set.add(r.name)
+      namesBy.set(r.steam64, set)
+    }
+    const avatarsBy = new Map<string, string[]>()
+    for (const r of avatarRows) {
+      const arr = avatarsBy.get(r.steam64) ?? []
+      arr.push(r.avatar_hash)
+      avatarsBy.set(r.steam64, arr)
+    }
+
+    return players.map((p) => {
+      const names = namesBy.get(p.steam64) ?? new Set<string>()
+      if (p.display_name) names.add(p.display_name)
+      return {
+        steam64: p.steam64,
+        displayName: p.display_name,
+        names: [...names],
+        avatarHashes: avatarsBy.get(p.steam64) ?? []
+      }
+    })
   }
 }

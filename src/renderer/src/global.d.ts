@@ -6,12 +6,22 @@ import type {
   NoteItem,
   UpdateStatus,
   RosterRow,
-  HomeOverview
+  HomeOverview,
+  ConnectionsResult
 } from '@shared/ipc'
 import type { ScanTimelineEntry } from '@shared/scanTimeline'
 
 // Re-export the shared IPC types so existing `from '../global'` imports keep working. (audit F-13)
-export type { SettingsStatus, AnalyzeResult, HistoryItem, NoteItem, UpdateStatus, RosterRow, HomeOverview }
+export type {
+  SettingsStatus,
+  AnalyzeResult,
+  HistoryItem,
+  NoteItem,
+  UpdateStatus,
+  RosterRow,
+  HomeOverview,
+  ConnectionsResult
+}
 
 export interface RendererApi {
   settings: {
@@ -31,6 +41,9 @@ export interface RendererApi {
   }
   home: {
     overview(): Promise<HomeOverview>
+  }
+  connections: {
+    find(): Promise<ConnectionsResult>
   }
   backup: {
     export(): Promise<{ ok: boolean; filePath?: string; canceled?: boolean }>

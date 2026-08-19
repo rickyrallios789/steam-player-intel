@@ -17,6 +17,7 @@ import type { PlayerReport } from '../shared/types'
 import { buildDiscordAlert } from '../shared/webhook'
 import { buildActivityFeed, type PlayerTimeline } from '../shared/activityFeed'
 import { validateBackup } from '../shared/backup'
+import { findAltLeads } from '../shared/altLeads'
 
 export interface IpcDeps {
   repos: Repositories
@@ -104,6 +105,12 @@ export function registerIpc(deps: IpcDeps): void {
       totalScans: players.reduce((n, p) => n + (p.scan_count ?? 0), 0),
       events: buildActivityFeed(timelines, 60)
     }
+  })
+
+  // ---- Alt-account "possible connection" leads (all local) — (v0.10.0) ----
+  ipcMain.handle('connections:find', async () => {
+    const players = deps.repos.getCorrelationData()
+    return { players: players.length, leads: findAltLeads(players) }
   })
 
   // ---- Rosters (saved lists) ----

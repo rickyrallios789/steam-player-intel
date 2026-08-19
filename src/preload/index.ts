@@ -13,7 +13,8 @@ import type {
   NoteItem,
   UpdateStatus,
   RosterRow,
-  HomeOverview
+  HomeOverview,
+  ConnectionsResult
 } from '../shared/ipc'
 
 const api = {
@@ -36,6 +37,9 @@ const api = {
   },
   home: {
     overview: (): Promise<HomeOverview> => ipcRenderer.invoke('home:overview')
+  },
+  connections: {
+    find: (): Promise<ConnectionsResult> => ipcRenderer.invoke('connections:find')
   },
   backup: {
     export: (): Promise<{ ok: boolean; filePath?: string; canceled?: boolean }> =>

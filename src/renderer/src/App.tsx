@@ -6,6 +6,7 @@ import {
   Star,
   GitCompare,
   Users,
+  Network,
   ClipboardList,
   Settings as SettingsIcon,
   Shield,
@@ -20,12 +21,22 @@ import HistoryPage from './pages/History'
 import Compare from './pages/Compare'
 import BulkScreen from './pages/BulkScreen'
 import Rosters from './pages/Rosters'
+import Connections from './pages/Connections'
 import Settings from './pages/Settings'
 import { CommandPalette, type Command } from './components/CommandPalette'
 import { OnboardingOverlay } from './components/OnboardingOverlay'
 import type { SettingsStatus } from './global'
 
-type View = 'home' | 'dashboard' | 'history' | 'favorites' | 'compare' | 'bulk' | 'rosters' | 'settings'
+type View =
+  | 'home'
+  | 'dashboard'
+  | 'history'
+  | 'favorites'
+  | 'compare'
+  | 'bulk'
+  | 'rosters'
+  | 'connections'
+  | 'settings'
 
 function useTheme(): [string, () => void] {
   const [theme, setTheme] = useState<string>(() => localStorage.getItem('theme') || 'dark')
@@ -98,6 +109,7 @@ export default function App() {
       { id: 'nav-compare', label: 'Go to Compare', run: () => setView('compare') },
       { id: 'nav-bulk', label: 'Go to Bulk screen', run: () => setView('bulk') },
       { id: 'nav-rosters', label: 'Go to Saved rosters', run: () => setView('rosters') },
+      { id: 'nav-connections', label: 'Go to Possible connections', run: () => setView('connections') },
       { id: 'nav-settings', label: 'Go to Settings', run: () => setView('settings') },
       { id: 'toggle-theme', label: 'Toggle light / dark theme', run: toggleTheme },
       { id: 'help-onboarding', label: 'Show welcome tour', run: () => setShowOnboarding(true) }
@@ -138,6 +150,7 @@ export default function App() {
           {nav('compare', <GitCompare size={17} />, 'Compare')}
           {nav('bulk', <Users size={17} />, 'Bulk screen')}
           {nav('rosters', <ClipboardList size={17} />, 'Saved rosters')}
+          {nav('connections', <Network size={17} />, 'Connections')}
           <div className="nav-spacer" />
           {!status?.steamKeySet && (
             <button className="nav-item" style={{ color: 'var(--warn)' }} onClick={() => setView('settings')}>
@@ -175,6 +188,7 @@ export default function App() {
               />
             )}
             {view === 'rosters' && <Rosters onScreen={screenRoster} />}
+            {view === 'connections' && <Connections onAnalyze={analyzeFromElsewhere} />}
             {view === 'settings' && <Settings status={status} onChange={refreshStatus} />}
           </ErrorBoundary>
         </main>
