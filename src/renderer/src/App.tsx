@@ -22,6 +22,7 @@ import BulkScreen from './pages/BulkScreen'
 import Rosters from './pages/Rosters'
 import Settings from './pages/Settings'
 import { CommandPalette, type Command } from './components/CommandPalette'
+import { OnboardingOverlay } from './components/OnboardingOverlay'
 import type { SettingsStatus } from './global'
 
 type View = 'home' | 'dashboard' | 'history' | 'favorites' | 'compare' | 'bulk' | 'rosters' | 'settings'
@@ -41,6 +42,13 @@ export default function App() {
   const [bulkPreset, setBulkPreset] = useState<string | null>(null)
   const [theme, toggleTheme] = useTheme()
   const [status, setStatus] = useState<SettingsStatus | null>(null)
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(
+    () => localStorage.getItem('onboarded') !== '1'
+  )
+  const closeOnboarding = useCallback(() => {
+    localStorage.setItem('onboarded', '1')
+    setShowOnboarding(false)
+  }, [])
 
   // "Screen now" on a saved roster: preload its members into Bulk screen and run.
   const screenRoster = (members: string): void => {
@@ -91,7 +99,8 @@ export default function App() {
       { id: 'nav-bulk', label: 'Go to Bulk screen', run: () => setView('bulk') },
       { id: 'nav-rosters', label: 'Go to Saved rosters', run: () => setView('rosters') },
       { id: 'nav-settings', label: 'Go to Settings', run: () => setView('settings') },
-      { id: 'toggle-theme', label: 'Toggle light / dark theme', run: toggleTheme }
+      { id: 'toggle-theme', label: 'Toggle light / dark theme', run: toggleTheme },
+      { id: 'help-onboarding', label: 'Show welcome tour', run: () => setShowOnboarding(true) }
     ],
     [toggleTheme]
   )
@@ -175,6 +184,14 @@ export default function App() {
           commands={commands}
           onAnalyze={analyzeFromElsewhere}
         />
+        {showOnboarding && (
+          <OnboardingOverlay
+            status={status}
+            onClose={closeOnboarding}
+            goSettings={() => setView('settings')}
+            goSearch={() => setView('dashboard')}
+          />
+        )}
       </div>
     </ToastProvider>
   )
