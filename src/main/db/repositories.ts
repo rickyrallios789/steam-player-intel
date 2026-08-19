@@ -302,4 +302,9 @@ export class Repositories {
   deleteRoster(id: number): void {
     this.db.prepare('DELETE FROM rosters WHERE id = ?').run(id)
   }
+
+  /** Stamp a roster's last scheduled re-screen time (used by the roster scheduler). */
+  markRosterRun(id: number, whenIso = new Date().toISOString()): void {
+    this.db.prepare('UPDATE rosters SET last_run = ? WHERE id = ?').run(whenIso, id)
+  }
 }

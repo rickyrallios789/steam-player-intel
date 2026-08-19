@@ -21,6 +21,7 @@ import { registerIpc } from './ipc'
 import { loadEnvFile } from './env'
 import { initUpdater, checkForUpdates } from './updater'
 import { MonitorService } from './services/monitor'
+import { RosterScheduler } from './services/rosterScheduler'
 import { installAppMenu, installContextMenu } from './menu'
 
 let mainWindow: BrowserWindow | null = null
@@ -101,6 +102,13 @@ if (!app.requestSingleInstanceLock()) {
       getMainWindow: () => mainWindow
     })
     if (repos.getSetting('monitor.enabled') === '1') monitor.start()
+
+    // Scheduled roster re-screens: any saved roster with an interval set is
+    // re-scanned in the background and a change digest is posted to the webhook.
+    // Self-gates on interval > 0 and a configured Steam key, so it's safe to
+    // always run. (v0.5.1)
+    const rosterScheduler = new RosterScheduler({ repos, credentials, http: httpClient })
+    rosterScheduler.start()
 
     registerIpc({ repos, credentials, http: httpClient, monitor, openExternal: (u) => shell.openExternal(u) })
 

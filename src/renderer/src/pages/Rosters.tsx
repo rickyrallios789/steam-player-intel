@@ -7,6 +7,13 @@ import { useToast } from '../components/ui'
 const MAX_NAME = 100
 const MAX_MEMBERS = 20000
 
+const INTERVAL_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: 'Off' },
+  { value: 6, label: 'Every 6h' },
+  { value: 12, label: 'Every 12h' },
+  { value: 24, label: 'Daily' }
+]
+
 interface Draft {
   id: number | null // null = creating a new roster
   name: string
@@ -66,6 +73,12 @@ export default function Rosters({ onScreen }: { onScreen: (members: string) => v
     await load()
   }
 
+  const changeInterval = async (r: RosterRow, hours: number): Promise<void> => {
+    await window.api.rosters.update(r.id, { intervalHours: hours })
+    toast(hours > 0 ? `Auto-screen every ${hours}h` : 'Auto-screen off')
+    await load()
+  }
+
   const draftCount = useMemo(() => (draft ? memberCount(draft.members) : 0), [draft])
 
   return (
@@ -80,7 +93,9 @@ export default function Rosters({ onScreen }: { onScreen: (members: string) => v
       </div>
       <div className="muted small" style={{ margin: '6px 0 14px' }}>
         Save a group of players once, then re-screen them any time with a single click. Members are the raw identifiers
-        you paste — Steam IDs, profile URLs, or vanity names.
+        you paste — Steam IDs, profile URLs, or vanity names. Set an <strong>Auto-screen</strong> interval to have a
+        roster re-checked in the background; new bans and privacy flips are posted to the Discord webhook you configure
+        in Settings.
       </div>
 
       {draft && (
@@ -138,6 +153,7 @@ export default function Rosters({ onScreen }: { onScreen: (members: string) => v
                 <th scope="col" style={{ textAlign: 'right' }}>
                   Members
                 </th>
+                <th scope="col">Auto-screen</th>
                 <th scope="col" style={{ textAlign: 'right' }}>
                   Actions
                 </th>
@@ -150,6 +166,22 @@ export default function Rosters({ onScreen }: { onScreen: (members: string) => v
                     <strong>{r.name}</strong>
                   </td>
                   <td style={{ textAlign: 'right' }}>{memberCount(r.members)}</td>
+                  <td>
+                    <select
+                      className="text"
+                      style={{ padding: '3px 6px', width: 'auto' }}
+                      value={r.interval_hours}
+                      onChange={(e) => changeInterval(r, Number(e.target.value))}
+                      aria-label={`Auto-screen interval for ${r.name}`}
+                      title="How often to re-screen this roster in the background"
+                    >
+                      {INTERVAL_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <button
                       className="btn small primary"
