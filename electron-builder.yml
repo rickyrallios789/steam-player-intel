@@ -11,6 +11,12 @@ asarUnpack:
   - "**/node_modules/better-sqlite3/**"
 win:
   target: [nsis]
+  # Code signing is OPTIONAL and driven entirely by environment variables in CI
+  # (WIN_CSC_LINK + WIN_CSC_KEY_PASSWORD). When they're set, electron-builder signs
+  # the installer automatically; when they're absent, an unsigned installer is
+  # produced (Windows SmartScreen shows an "unknown publisher" prompt on install).
+  # See docs/SIGNING.md for how to add a certificate. No config change is needed
+  # here to turn signing on — just add the two repository Secrets.
 mac:
   target: [dmg]
   category: public.app-category.utilities

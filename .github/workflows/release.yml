@@ -41,6 +41,14 @@ jobs:
         env:
           # electron-builder reads this to upload the release. Provided automatically.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Windows code signing (OPTIONAL). electron-builder signs the installer
+          # automatically when these are present, and builds UNSIGNED (no failure)
+          # when they're absent. Add them as repository Secrets to enable signing —
+          # see docs/SIGNING.md.
+          #   WIN_CSC_LINK         = base64 of your code-signing .pfx (or a path/URL to it)
+          #   WIN_CSC_KEY_PASSWORD = the .pfx password
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: npm run release
 
 # To also build macOS/Linux, add jobs on `macos-latest` / `ubuntu-latest`.
