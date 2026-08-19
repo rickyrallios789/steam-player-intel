@@ -10,7 +10,10 @@ export interface RendererApi {
     status(): Promise<SettingsStatus>
     setCredential(name: string, value: string): Promise<SettingsStatus>
   }
-  analyze(raw: string, opts?: { bypassCache?: boolean; persist?: boolean }): Promise<AnalyzeResult>
+  analyze(
+    raw: string,
+    opts?: { bypassCache?: boolean; persist?: boolean; includeFriends?: boolean }
+  ): Promise<AnalyzeResult>
   history: {
     list(): Promise<HistoryItem[]>
     setFavorite(steam64: string, favorite: boolean): Promise<{ ok: boolean }>

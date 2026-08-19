@@ -9,6 +9,7 @@ import {
   RustTab,
   ServersTab,
   SecurityTab,
+  FriendsTab,
   NamesTab,
   TimelineTab,
   ScanHistoryTab,
@@ -25,6 +26,7 @@ const TABS = [
   'Activity',
   'Names',
   'Security',
+  'Friends',
   'Timeline',
   'Scan history',
   'Profile',
@@ -269,6 +271,7 @@ export default function PlayerReportView({
       {tab === 'Activity' && <GamesTab report={report} recentOnly />}
       {tab === 'Names' && <NamesTab report={report} />}
       {tab === 'Security' && <SecurityTab report={report} />}
+      {tab === 'Friends' && <FriendsTab report={report} />}
       {tab === 'Timeline' && <TimelineTab report={report} />}
       {tab === 'Scan history' && <ScanHistoryTab report={report} />}
       {tab === 'Profile' && <ProfileTab report={report} />}

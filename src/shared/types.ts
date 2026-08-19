@@ -178,6 +178,36 @@ export interface PlayerIdentity {
   steamLevel: Field<number>
 }
 
+/** One friend of the profile, with their public ban record. (v0.6.0) */
+export interface FriendBanEntry {
+  steam64: string
+  name: string | null
+  avatarUrl: string | null
+  vacBans: number
+  gameBans: number
+  communityBanned: boolean
+  daysSinceLastBan: number
+}
+
+/**
+ * Friend-network ban screening. Surfaces how many of a profile's friends carry
+ * public bans — a lead to investigate for alt/cheater circles, NEVER proof of
+ * wrongdoing by the profile itself. Only available when the friend list is public.
+ */
+export interface FriendNetwork {
+  /** True when the friend list was public and screenable; false = private/unavailable/not screened. */
+  available: Field<boolean>
+  totalFriends: Field<number>
+  /** How many friends we actually pulled ban records for (may be capped below total). */
+  screened: Field<number>
+  friendsWithBans: Field<number>
+  vacBanned: Field<number>
+  gameBanned: Field<number>
+  communityBanned: Field<number>
+  /** Banned friends, most-severe first — leads to investigate, not proof. */
+  flaggedFriends: Field<FriendBanEntry[]>
+}
+
 export interface ChangeEntry {
   field: string
   label: string
@@ -198,6 +228,7 @@ export interface PlayerReport {
   games: OwnedGamesSummary
   rust: RustSummary
   bans: BanInfo
+  friends: FriendNetwork
   servers: ServerObservation[]
   names: NameObservation[]
   timeline: TimelineEvent[]

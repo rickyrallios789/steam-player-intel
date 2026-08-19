@@ -7,7 +7,7 @@
  * tagged with its source, and failures surface as a ProviderIssue (never a crash).
  */
 import type { HttpClient } from '../core/httpClient'
-import type { DataSource, GameStat, ServerObservation, NameObservation } from '../../shared/types'
+import type { DataSource, GameStat, ServerObservation, NameObservation, FriendBanEntry } from '../../shared/types'
 
 export interface ProviderIssue {
   provider: string
@@ -82,6 +82,15 @@ export interface NameHistoryData {
   names: NameObservation[]
 }
 
+export interface FriendNetworkData {
+  /** Total friends reported by Steam (before any screening cap). */
+  totalFriends: number
+  /** How many friends we pulled ban records for. */
+  screened: number
+  /** Per-friend public ban records for the screened friends. */
+  friends: FriendBanEntry[]
+}
+
 /**
  * The common provider interface. All methods are optional; the ProviderManager
  * calls whatever a given provider implements and merges the tagged results.
@@ -100,6 +109,7 @@ export interface DataProvider {
   getSecurityData?(ctx: ProviderContext): Promise<Capability<SecurityData>>
   getServerHistory?(ctx: ProviderContext): Promise<Capability<ServerHistoryData>>
   getNameHistory?(ctx: ProviderContext): Promise<Capability<NameHistoryData>>
+  getFriendNetwork?(ctx: ProviderContext): Promise<Capability<FriendNetworkData>>
 }
 
 /** Friendly messages for common failure codes (spec §26). */
@@ -110,6 +120,8 @@ export const FRIENDLY_MESSAGES: Record<string, string> = {
     'This Steam profile is private, so some information could not be retrieved. Public fields are still shown where available.',
   private_games:
     'This player’s game details are private. Game and playtime data cannot be shown for a private library.',
+  private_friends:
+    'This player’s friends list is private, so the friend network could not be screened. Nothing is inferred from a hidden friends list.',
   profile_not_found: 'No Steam account was found for that ID.',
   rate_limited: 'Steam is rate-limiting requests right now. Please try again in a moment.',
   api_unavailable:

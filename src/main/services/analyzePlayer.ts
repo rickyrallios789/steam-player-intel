@@ -16,11 +16,18 @@ import type { Repositories } from '../db/repositories'
 import { SteamProvider } from '../providers/SteamProvider'
 import { BattleMetricsProvider } from '../providers/BattleMetricsProvider'
 import { LocalHistoryProvider } from '../providers/LocalHistoryProvider'
-import type { Capability, ProviderContext, ProviderIssue, ServerHistoryData } from '../providers/types'
+import type {
+  Capability,
+  FriendNetworkData,
+  ProviderContext,
+  ProviderIssue,
+  ServerHistoryData
+} from '../providers/types'
 import { resolveToSteam64 } from '../../shared/steamid'
 import { steam64ToSet } from '../../shared/steamid'
 import { buildAccountAge, creationIso } from '../../shared/accountAge'
 import { computeGameStats, computePlaytimeVsAge, computeProfileScore } from '../../shared/analysis'
+import { summarizeFriendNetwork } from '../../shared/friendNetwork'
 import { diffSnapshots, type PlayerSnapshot } from '../../shared/changeDetection'
 import {
   field,
@@ -28,6 +35,7 @@ import {
   RUST_APP_ID,
   type CommunityVisibility,
   type DataSource,
+  type FriendNetwork,
   type NameObservation,
   type PersonaState,
   type PlayerReport,
@@ -47,10 +55,59 @@ export interface AnalyzeOptions {
   bypassCache?: boolean
   /** When false, the scan is not written to local history (preview only). */
   persist?: boolean
+  /** Opt-in friend-network ban screening (extra Steam API calls). Single interactive scans only. */
+  includeFriends?: boolean
 }
 
 const steam = new SteamProvider()
 const battlemetrics = new BattleMetricsProvider()
+
+/** Assemble the friends report section, honestly labelling private/unscreened cases. */
+function buildFriendsSection(cap: Capability<FriendNetworkData> | null): FriendNetwork {
+  if (!cap) {
+    const note = 'Friend network was not screened in this scan.'
+    return {
+      available: field(false, 'steam', 'unknown', note),
+      totalFriends: missing('steam', 'unknown', note),
+      screened: missing('steam', 'unknown'),
+      friendsWithBans: missing('derived', 'unknown'),
+      vacBanned: missing('derived', 'unknown'),
+      gameBanned: missing('derived', 'unknown'),
+      communityBanned: missing('derived', 'unknown'),
+      flaggedFriends: missing('steam', 'unknown')
+    }
+  }
+  if (!cap.data) {
+    const status = cap.issue?.code === 'private_friends' ? ('private' as const) : ('unavailable' as const)
+    const note = cap.issue?.message
+    return {
+      available: field(false, 'steam', status, note),
+      totalFriends: missing('steam', status, note),
+      screened: missing('steam', status),
+      friendsWithBans: missing('derived', status),
+      vacBanned: missing('derived', status),
+      gameBanned: missing('derived', status),
+      communityBanned: missing('derived', status),
+      flaggedFriends: missing('steam', status)
+    }
+  }
+  const s = summarizeFriendNetwork(cap.data.friends)
+  return {
+    available: field(true, 'steam', 'verified'),
+    totalFriends: field(cap.data.totalFriends, 'steam', 'verified'),
+    screened: field(cap.data.screened, 'steam', 'verified'),
+    friendsWithBans: field(s.friendsWithBans, 'derived', 'inferred'),
+    vacBanned: field(s.vacBanned, 'derived', 'inferred'),
+    gameBanned: field(s.gameBanned, 'derived', 'inferred'),
+    communityBanned: field(s.communityBanned, 'derived', 'inferred'),
+    flaggedFriends: field(
+      s.flagged,
+      'steam',
+      'verified',
+      'Friends with public bans — leads to investigate, not proof of wrongdoing by this profile.'
+    )
+  }
+}
 
 function personaState(n: number): PersonaState {
   const map: Record<number, PersonaState> = {
@@ -99,13 +156,20 @@ export async function analyzePlayer(
         .getServerHistory(ctx)
         .catch<Capability<ServerHistoryData>>(() => ({ data: { servers: [] }, source: 'battlemetrics' }))
     : Promise.resolve<Capability<ServerHistoryData>>({ data: null, source: 'battlemetrics' })
-  const [profileCap, levelCap, gamesCap, recentCap, securityCap, bmCap] = await Promise.all([
+  // Friend-network ban screening is opt-in (extra API calls) — single interactive scans only.
+  const includeFriends = opts.includeFriends === true
+  const friendPromise: Promise<Capability<FriendNetworkData> | null> = includeFriends
+    ? steam.getFriendNetwork(ctx).catch(() => null)
+    : Promise.resolve(null)
+
+  const [profileCap, levelCap, gamesCap, recentCap, securityCap, bmCap, friendCap] = await Promise.all([
     steam.getPlayerProfile(ctx),
     steam.getSteamLevel(ctx),
     steam.getGames(ctx),
     steam.getRecentActivity(ctx),
     steam.getSecurityData(ctx),
-    bmPromise
+    bmPromise,
+    friendPromise
   ])
 
   for (const cap of [profileCap, levelCap, gamesCap, recentCap, securityCap, bmCap]) {
@@ -116,6 +180,7 @@ export async function analyzePlayer(
   raw.steam_games = gamesCap.raw ?? null
   raw.steam_bans = securityCap.raw ?? null
   if (bmCap.raw) raw.battlemetrics = bmCap.raw
+  if (friendCap?.raw) raw.steam_friends = friendCap.raw
 
   // If Steam has no key at all, the profile call reports 'no_api_key' — fail clearly.
   if (profileCap.issue?.code === 'no_api_key') {
@@ -389,6 +454,7 @@ export async function analyzePlayer(
     games,
     rust,
     bans,
+    friends: buildFriendsSection(friendCap),
     servers,
     names,
     timeline,

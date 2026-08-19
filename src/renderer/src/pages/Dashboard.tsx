@@ -32,7 +32,7 @@ export default function Dashboard({
     setLoading(true)
     setError(null)
     try {
-      const res = await window.api.analyze(raw, { bypassCache })
+      const res = await window.api.analyze(raw, { bypassCache, includeFriends: true })
       if (myReq !== reqRef.current) return
       if (res.ok && res.report) setReport(res.report)
       else {

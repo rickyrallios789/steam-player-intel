@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { Trash2, Plus, ShieldCheck, ShieldAlert, Ban, HelpCircle } from 'lucide-react'
+import { Trash2, Plus, ShieldCheck, ShieldAlert, Ban, HelpCircle, ExternalLink } from 'lucide-react'
 import type { GameStat, PlayerReport, TimelineEvent } from '@shared/types'
 import { formatHours, formatNumber, unixToDisplay, minutesToHours, relativeTime } from '@shared/format'
 import { buildScanTimeline } from '@shared/scanTimeline'
@@ -376,6 +376,117 @@ function SecRow({ label, state, text }: { label: string; state: 'good' | 'warn' 
         {icon} {label}
       </span>
       <span className={`status-pill ${cls}`}>{text}</span>
+    </div>
+  )
+}
+
+// ---------------- Friends (network ban screening) ----------------
+export function FriendsTab({ report }: { report: PlayerReport }) {
+  const f = report.friends
+  const available = f.available.value === true
+  const flagged = f.flaggedFriends.value ?? []
+
+  if (!available) {
+    const isPrivate = f.available.status === 'private'
+    return (
+      <Panel>
+        <div className="empty">
+          {isPrivate
+            ? 'This player’s friends list is private, so the friend network could not be screened. Nothing is inferred from a hidden friends list.'
+            : f.available.note ?? 'The friend network was not screened for this scan.'}
+        </div>
+      </Panel>
+    )
+  }
+
+  const total = f.totalFriends.value ?? 0
+  const screened = f.screened.value ?? 0
+
+  return (
+    <div className="grid">
+      <div className="stat-cards">
+        <Mini label="Friends" value={formatNumber(total)} />
+        <Mini label="Screened" value={formatNumber(screened)} />
+        <Mini label="With bans" value={formatNumber(f.friendsWithBans.value)} />
+        <Mini label="VAC" value={formatNumber(f.vacBanned.value)} />
+        <Mini label="Game bans" value={formatNumber(f.gameBanned.value)} />
+        <Mini label="Community" value={formatNumber(f.communityBanned.value)} />
+      </div>
+
+      <div className="callout info">
+        Friends carrying public bans are shown as <strong>leads to investigate</strong> — never proof that this profile
+        did anything. A clean friend list is not exoneration, and a banned friend is not an accusation.
+      </div>
+
+      {screened < total && (
+        <div className="muted small">
+          Screened the first {formatNumber(screened)} of {formatNumber(total)} friends (capped to stay within Steam’s API
+          limits).
+        </div>
+      )}
+
+      <Panel title={`Friends with bans (${flagged.length})`}>
+        {flagged.length === 0 ? (
+          <div className="empty">None of the screened friends carry a public VAC, game, or community ban.</div>
+        ) : (
+          <table className="data">
+            <thead>
+              <tr>
+                <th scope="col">Friend</th>
+                <th scope="col" style={{ textAlign: 'right' }}>
+                  VAC
+                </th>
+                <th scope="col" style={{ textAlign: 'right' }}>
+                  Game bans
+                </th>
+                <th scope="col">Community</th>
+                <th scope="col" style={{ textAlign: 'right' }}>
+                  Days since ban
+                </th>
+                <th scope="col" aria-label="Open profile" />
+              </tr>
+            </thead>
+            <tbody>
+              {flagged.map((fr) => (
+                <tr key={fr.steam64}>
+                  <td>
+                    <div className="row center" style={{ gap: 8 }}>
+                      {fr.avatarUrl && (
+                        <img src={fr.avatarUrl} width={22} height={22} style={{ borderRadius: 4 }} alt="" />
+                      )}
+                      <div>
+                        <div>{fr.name ?? '—'}</div>
+                        <div className="mono small muted">{fr.steam64}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ textAlign: 'right', color: fr.vacBans > 0 ? 'var(--bad)' : undefined }}>
+                    {fr.vacBans || '—'}
+                  </td>
+                  <td style={{ textAlign: 'right', color: fr.gameBans > 0 ? 'var(--bad)' : undefined }}>
+                    {fr.gameBans || '—'}
+                  </td>
+                  <td style={{ color: fr.communityBanned ? 'var(--bad)' : undefined }}>
+                    {fr.communityBanned ? 'Banned' : '—'}
+                  </td>
+                  <td style={{ textAlign: 'right' }} className="muted small">
+                    {fr.daysSinceLastBan > 0 ? fr.daysSinceLastBan : '—'}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button
+                      className="btn small ghost"
+                      onClick={() => window.api.openExternal('https://steamcommunity.com/profiles/' + fr.steam64)}
+                      title="Open this friend’s Steam profile"
+                    >
+                      Profile <ExternalLink size={11} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Panel>
     </div>
   )
 }

@@ -9,13 +9,14 @@
 import type {
   Capability,
   DataProvider,
+  FriendNetworkData,
   GamesData,
   ProviderContext,
   SecurityData,
   SteamSummaryData
 } from './types'
 import { issue } from './types'
-import type { GameStat } from '../../shared/types'
+import type { FriendBanEntry, GameStat } from '../../shared/types'
 
 const STEAM_HOST = 'api.steampowered.com'
 const BASE = `https://${STEAM_HOST}`
@@ -25,7 +26,19 @@ const TTL = {
   bans: 5 * 60_000,
   games: 5 * 60_000,
   level: 10 * 60_000,
-  recent: 2 * 60_000
+  recent: 2 * 60_000,
+  friends: 15 * 60_000
+}
+
+/** Steam's batch endpoints accept up to 100 steamids at a time. */
+const BATCH = 100
+/** Cap how many friends we screen so a huge friends list can't balloon API cost. */
+const MAX_FRIEND_SCREEN = 200
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+  return out
 }
 
 function gameIcon(appid: number, hash: string | null | undefined): string | null {
@@ -48,6 +61,9 @@ interface RawLevel {
 }
 interface RawVanity {
   response?: { success?: number; steamid?: string; message?: string }
+}
+interface RawFriendList {
+  friendslist?: { friends?: Array<{ steamid?: string; friend_since?: number }> }
 }
 
 export class SteamProvider implements DataProvider {
@@ -235,6 +251,100 @@ export class SteamProvider implements DataProvider {
       fromCache: res.fromCache,
       cachedAt: res.cachedAt,
       stale: res.stale
+    }
+  }
+
+  /**
+   * Friend-network ban screening: fetch the profile's (public) friend list, then
+   * batch-pull ban records + summaries for those friends. A private friends list
+   * yields HTTP 401, surfaced as a 'private_friends' issue with null data — never
+   * fabricated. Screening is capped to keep API cost bounded on huge lists.
+   */
+  async getFriendNetwork(ctx: ProviderContext): Promise<Capability<FriendNetworkData>> {
+    const key = await this.key(ctx)
+    if (!key) return { data: null, source: 'steam', issue: issue(this.name, 'no_api_key') }
+
+    const listUrl = `${BASE}/ISteamUser/GetFriendList/v1/?key=${key}&steamid=${ctx.steam64}&relationship=friend`
+    const listRes = await ctx.http.getJson<RawFriendList>(listUrl, {
+      host: STEAM_HOST,
+      cacheKey: `friends:${ctx.steam64}`,
+      cacheTtlMs: TTL.friends,
+      bypassCache: ctx.bypassCache
+    })
+    // A private friends list returns 401; treat any non-OK as "cannot screen".
+    if (!listRes.ok) {
+      return { data: null, source: 'steam', issue: issue(this.name, 'private_friends'), raw: listRes.data }
+    }
+    const allIds = (listRes.data?.friendslist?.friends ?? [])
+      .map((f) => (typeof f.steamid === 'string' ? f.steamid : null))
+      .filter((s): s is string => Boolean(s))
+    const totalFriends = allIds.length
+    const ids = allIds.slice(0, MAX_FRIEND_SCREEN)
+
+    if (ids.length === 0) {
+      return {
+        data: { totalFriends, screened: 0, friends: [] },
+        source: 'steam',
+        raw: { total: totalFriends },
+        fromCache: listRes.fromCache,
+        cachedAt: listRes.cachedAt,
+        stale: listRes.stale
+      }
+    }
+
+    // Batch ban records (up to 100 ids per call).
+    const bansById = new Map<string, Record<string, unknown>>()
+    for (const group of chunk(ids, BATCH)) {
+      const url = `${BASE}/ISteamUser/GetPlayerBans/v1/?key=${key}&steamids=${group.join(',')}`
+      const res = await ctx.http.getJson<RawBans>(url, {
+        host: STEAM_HOST,
+        cacheKey: `friendbans:${group[0]}:${group.length}`,
+        cacheTtlMs: TTL.bans,
+        bypassCache: ctx.bypassCache
+      })
+      for (const p of res.data?.players ?? []) {
+        const sid = String(p.SteamId ?? '')
+        if (sid) bansById.set(sid, p)
+      }
+    }
+
+    // Batch summaries for names/avatars (up to 100 ids per call).
+    const summaryById = new Map<string, Record<string, unknown>>()
+    for (const group of chunk(ids, BATCH)) {
+      const url = `${BASE}/ISteamUser/GetPlayerSummaries/v2/?key=${key}&steamids=${group.join(',')}`
+      const res = await ctx.http.getJson<RawSummary>(url, {
+        host: STEAM_HOST,
+        cacheKey: `friendsummaries:${group[0]}:${group.length}`,
+        cacheTtlMs: TTL.summary,
+        bypassCache: ctx.bypassCache
+      })
+      for (const p of res.data?.response?.players ?? []) {
+        const sid = String(p.steamid ?? '')
+        if (sid) summaryById.set(sid, p)
+      }
+    }
+
+    const friends: FriendBanEntry[] = ids.map((sid) => {
+      const b = bansById.get(sid)
+      const s = summaryById.get(sid)
+      return {
+        steam64: sid,
+        name: (s?.personaname as string) ?? null,
+        avatarUrl: (s?.avatar as string) ?? (s?.avatarfull as string) ?? null,
+        vacBans: Number(b?.NumberOfVACBans ?? 0),
+        gameBans: Number(b?.NumberOfGameBans ?? 0),
+        communityBanned: Boolean(b?.CommunityBanned),
+        daysSinceLastBan: Number(b?.DaysSinceLastBan ?? 0)
+      }
+    })
+
+    return {
+      data: { totalFriends, screened: friends.length, friends },
+      source: 'steam',
+      raw: { total: totalFriends, screened: friends.length },
+      fromCache: listRes.fromCache,
+      cachedAt: listRes.cachedAt,
+      stale: listRes.stale
     }
   }
 }

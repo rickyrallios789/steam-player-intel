@@ -14,8 +14,10 @@ const api = {
     setCredential: (name: string, value: string): Promise<SettingsStatus> =>
       ipcRenderer.invoke('settings:setCredential', { name, value })
   },
-  analyze: (raw: string, opts?: { bypassCache?: boolean; persist?: boolean }): Promise<AnalyzeResult> =>
-    ipcRenderer.invoke('player:analyze', { raw, ...(opts ?? {}) }),
+  analyze: (
+    raw: string,
+    opts?: { bypassCache?: boolean; persist?: boolean; includeFriends?: boolean }
+  ): Promise<AnalyzeResult> => ipcRenderer.invoke('player:analyze', { raw, ...(opts ?? {}) }),
   history: {
     list: (): Promise<HistoryItem[]> => ipcRenderer.invoke('history:list'),
     setFavorite: (steam64: string, favorite: boolean) =>

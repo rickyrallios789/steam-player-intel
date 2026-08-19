@@ -49,11 +49,16 @@ export function registerIpc(deps: IpcDeps): void {
   // ---- Analyze ----
   ipcMain.handle(
     'player:analyze',
-    async (_e, payload: { raw: string; bypassCache?: boolean; persist?: boolean }) => {
+    async (_e, payload: { raw: string; bypassCache?: boolean; persist?: boolean; includeFriends?: boolean }) => {
       try {
         const result = await analyzePlayer(
           { http: deps.http, credentials: deps.credentials, repos: deps.repos },
-          { raw: assertString(payload?.raw ?? '', 300), bypassCache: !!payload?.bypassCache, persist: payload?.persist }
+          {
+            raw: assertString(payload?.raw ?? '', 300),
+            bypassCache: !!payload?.bypassCache,
+            persist: payload?.persist,
+            includeFriends: !!payload?.includeFriends
+          }
         )
         return result
       } catch (err) {
