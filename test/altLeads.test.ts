@@ -1,11 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import { findAltLeads, normalizeName, levenshtein, type CorrelationPlayer } from '../src/shared/altLeads'
 
-const P = (steam64: string, displayName: string | null, names: string[], avatarHashes: string[]): CorrelationPlayer => ({
+const P = (
+  steam64: string,
+  displayName: string | null,
+  names: string[],
+  avatarHashes: string[],
+  friends: string[] = []
+): CorrelationPlayer => ({
   steam64,
   displayName,
   names,
-  avatarHashes
+  avatarHashes,
+  friends
 })
 
 describe('normalizeName / levenshtein', () => {
@@ -79,5 +86,30 @@ describe('findAltLeads (v0.10.0)', () => {
       P('2', 'GG', ['GG'], ['h2'])
     ])
     expect(leads).toEqual([])
+  })
+
+  it('flags accounts that share enough distinctive friends', () => {
+    const leads = findAltLeads([
+      P('1', 'Alpha', ['Alpha'], ['h1'], ['f1', 'f2', 'f3', 'f4']),
+      P('2', 'Bravo', ['Bravo'], ['h2'], ['f1', 'f2', 'f3', 'f9'])
+    ])
+    expect(leads.length).toBe(1)
+    expect(leads[0].signals.some((s) => s.includes('shared friends'))).toBe(true)
+  })
+
+  it('does not flag a pair sharing fewer than the minimum friends', () => {
+    const leads = findAltLeads([
+      P('1', 'Alpha', ['Alpha'], ['h1'], ['f1', 'f2']),
+      P('2', 'Bravo', ['Bravo'], ['h2'], ['f1', 'f2'])
+    ])
+    expect(leads).toEqual([])
+  })
+
+  it('ignores ubiquitous friends shared by many accounts', () => {
+    // Everyone shares f1..f4, so those friends are non-distinctive and should not link any pair.
+    const shared = ['f1', 'f2', 'f3', 'f4']
+    const distinctNames = ['Zephyr', 'Quokka', 'Basalt', 'Merlot', 'Cinder', 'Tundra', 'Vellum', 'Gadget', 'Harlequin']
+    const many = distinctNames.map((n, i) => P(String(i), n, [n], [`av${i}`], shared))
+    expect(findAltLeads(many)).toEqual([])
   })
 })

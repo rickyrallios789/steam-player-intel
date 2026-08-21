@@ -41,9 +41,10 @@ export default function Connections({ onAnalyze }: { onAnalyze: (steam64: string
           <strong>These are leads to review — not proof of anything.</strong>
         </div>
         <div className="small" style={{ marginTop: 6 }}>
-          This compares accounts you've already scanned and flags ones that share an avatar image or a very similar
-          name. People reuse avatars and names for many innocent reasons, so treat every entry as a starting point for
-          your own investigation. Nothing here is sent anywhere — it's computed entirely from your local history.
+          This compares accounts you've already scanned and flags ones that share an avatar image, a very similar name,
+          or several friends in common. People reuse avatars and names and share social circles for many innocent
+          reasons, so treat every entry as a starting point for your own investigation. Nothing here is sent anywhere —
+          it's computed entirely from your local history.
         </div>
       </div>
 

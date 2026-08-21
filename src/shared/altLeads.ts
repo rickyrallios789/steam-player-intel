@@ -13,6 +13,9 @@
  *    Steam's default avatars, which would otherwise create noise).
  *  - Similar name: normalized display / observed names that match exactly, contain
  *    one another, or are within a small edit distance.
+ *  - Shared friends: two accounts that share several friends, excluding friends that
+ *    are common to many accounts (which would be non-distinctive). Requires friend
+ *    lists to have been captured locally by the friend-network screening. (v0.10.1)
  */
 export interface CorrelationPlayer {
   steam64: string
@@ -21,6 +24,8 @@ export interface CorrelationPlayer {
   names: string[]
   /** All distinct avatar hashes this app has seen for this account. */
   avatarHashes: string[]
+  /** Steam64s of this account's screened friends (if captured locally). */
+  friends?: string[]
 }
 
 export interface AltLead {
@@ -39,6 +44,10 @@ const MAX_NAMES = 8
 /** Avatar hashes shared by more than this many accounts are treated as generic (e.g. Steam defaults). */
 const MAX_AVATAR_SHARE = 4
 const MAX_LEADS = 100
+/** Friends shared by more than this many scanned accounts are non-distinctive and ignored. */
+const MAX_FRIEND_SHARE = 8
+/** Minimum distinctive friends in common before a pair is flagged. */
+const MIN_SHARED_FRIENDS = 3
 
 export function normalizeName(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -121,6 +130,31 @@ export function findAltLeads(players: CorrelationPlayer[]): AltLead[] {
     }
   }
 
+  // Count distinctive shared friends per pair via an inverted index (friend -> owners).
+  // Friends common to many scanned accounts are non-distinctive and skipped.
+  const friendToOwners = new Map<string, string[]>()
+  for (const p of list) {
+    for (const f of new Set(p.friends ?? [])) {
+      if (!f) continue
+      const arr = friendToOwners.get(f) ?? []
+      arr.push(p.steam64)
+      friendToOwners.set(f, arr)
+    }
+  }
+  const sharedFriends = new Map<string, number>() // "a|b" (sorted steam64s) -> count
+  for (const ownersOfFriend of friendToOwners.values()) {
+    if (ownersOfFriend.length < 2 || ownersOfFriend.length > MAX_FRIEND_SHARE) continue
+    for (let x = 0; x < ownersOfFriend.length; x++) {
+      for (let y = x + 1; y < ownersOfFriend.length; y++) {
+        const [p, q] = ownersOfFriend[x] < ownersOfFriend[y]
+          ? [ownersOfFriend[x], ownersOfFriend[y]]
+          : [ownersOfFriend[y], ownersOfFriend[x]]
+        const key = `${p}|${q}`
+        sharedFriends.set(key, (sharedFriends.get(key) ?? 0) + 1)
+      }
+    }
+  }
+
   const leads: AltLead[] = []
   for (let i = 0; i < list.length; i++) {
     for (let j = i + 1; j < list.length; j++) {
@@ -149,6 +183,13 @@ export function findAltLeads(players: CorrelationPlayer[]): AltLead[] {
       if (nameSim) {
         signals.push(`Similar name: "${nameSim.matched[0]}" ↔ "${nameSim.matched[1]}"`)
         score += nameSim.score
+      }
+
+      const pairKey = a.steam64 < b.steam64 ? `${a.steam64}|${b.steam64}` : `${b.steam64}|${a.steam64}`
+      const shared = sharedFriends.get(pairKey) ?? 0
+      if (shared >= MIN_SHARED_FRIENDS) {
+        signals.push(`${shared} shared friends`)
+        score += shared >= 10 ? 4 : shared >= 5 ? 3 : 2
       }
 
       if (score >= 2 && signals.length > 0) {

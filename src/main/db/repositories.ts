@@ -325,7 +325,8 @@ export class Repositories {
       notes: all('notes'),
       tags: all('tags'),
       settings: all('app_settings'),
-      rosters: all('rosters')
+      rosters: all('rosters'),
+      friendEdges: all('friend_edges')
     }
   }
 
@@ -444,13 +445,35 @@ export class Repositories {
         insRoster.run(name, s(r.members), Number(r.interval_hours ?? 0), sOrNull(r.last_run), s(r.created_at, new Date().toISOString()))
         summary.rosters++
       }
+
+      const insFriend = this.db.prepare(
+        'INSERT OR IGNORE INTO friend_edges (owner, friend, seen_at) VALUES (?, ?, ?)'
+      )
+      for (const fe of data.friendEdges) {
+        const owner = s(fe.owner)
+        const friend = s(fe.friend)
+        if (!owner || !friend) continue
+        insFriend.run(owner, friend, s(fe.seen_at, new Date().toISOString()))
+      }
     })
     tx()
     return summary
   }
 
-  // ---- Alt-account correlation data (all local) — (v0.10.0) ----
-  /** Assemble every scanned account with its known names and observed avatar hashes. */
+  // ---- Alt-account correlation data (all local) — (v0.10.0 / v0.10.1) ----
+  /** Replace the stored friend list for one account (captured during friend screening). */
+  setFriendEdges(owner: string, friends: string[]): void {
+    const nowIso = new Date().toISOString()
+    const del = this.db.prepare('DELETE FROM friend_edges WHERE owner = ?')
+    const ins = this.db.prepare('INSERT OR IGNORE INTO friend_edges (owner, friend, seen_at) VALUES (?, ?, ?)')
+    const tx = this.db.transaction(() => {
+      del.run(owner)
+      for (const f of friends) if (f && f !== owner) ins.run(owner, f, nowIso)
+    })
+    tx()
+  }
+
+  /** Assemble every scanned account with its known names, observed avatar hashes, and friends. */
   getCorrelationData(): CorrelationPlayer[] {
     const players = this.db.prepare('SELECT steam64, display_name FROM players').all() as {
       steam64: string
@@ -463,6 +486,10 @@ export class Repositories {
     const avatarRows = this.db
       .prepare('SELECT DISTINCT steam64, avatar_hash FROM scans WHERE avatar_hash IS NOT NULL')
       .all() as { steam64: string; avatar_hash: string }[]
+    const friendRows = this.db.prepare('SELECT owner, friend FROM friend_edges').all() as {
+      owner: string
+      friend: string
+    }[]
 
     const namesBy = new Map<string, Set<string>>()
     for (const r of nameRows) {
@@ -476,6 +503,12 @@ export class Repositories {
       arr.push(r.avatar_hash)
       avatarsBy.set(r.steam64, arr)
     }
+    const friendsBy = new Map<string, string[]>()
+    for (const r of friendRows) {
+      const arr = friendsBy.get(r.owner) ?? []
+      arr.push(r.friend)
+      friendsBy.set(r.owner, arr)
+    }
 
     return players.map((p) => {
       const names = namesBy.get(p.steam64) ?? new Set<string>()
@@ -484,7 +517,8 @@ export class Repositories {
         steam64: p.steam64,
         displayName: p.display_name,
         names: [...names],
-        avatarHashes: avatarsBy.get(p.steam64) ?? []
+        avatarHashes: avatarsBy.get(p.steam64) ?? [],
+        friends: friendsBy.get(p.steam64) ?? []
       }
     })
   }

@@ -182,6 +182,19 @@ export async function analyzePlayer(
   if (bmCap.raw) raw.battlemetrics = bmCap.raw
   if (friendCap?.raw) raw.steam_friends = friendCap.raw
 
+  // Persist the screened friend list locally so the Connections view can surface
+  // shared-friend leads across accounts. Best-effort; never blocks the report. (v0.10.1)
+  if (includeFriends && opts.persist !== false && friendCap?.data) {
+    try {
+      deps.repos.setFriendEdges(
+        steam64,
+        friendCap.data.friends.map((f) => f.steam64)
+      )
+    } catch {
+      /* best-effort */
+    }
+  }
+
   // If Steam has no key at all, the profile call reports 'no_api_key' — fail clearly.
   if (profileCap.issue?.code === 'no_api_key') {
     return { ok: false, error: profileCap.issue.message, detectedLabel: resolution.detection.label }

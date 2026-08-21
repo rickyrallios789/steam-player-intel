@@ -125,6 +125,14 @@ CREATE TABLE IF NOT EXISTS rosters (
   last_run       TEXT,
   created_at     TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS friend_edges (
+  owner   TEXT NOT NULL,
+  friend  TEXT NOT NULL,
+  seen_at TEXT NOT NULL,
+  PRIMARY KEY (owner, friend)
+);
+CREATE INDEX IF NOT EXISTS idx_friend_edges_friend ON friend_edges(friend);
 `
 
 export class AppDatabase {

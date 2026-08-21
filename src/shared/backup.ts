@@ -22,6 +22,7 @@ export interface BackupData {
   tags: Row[]
   settings: Row[]
   rosters: Row[]
+  friendEdges: Row[]
 }
 
 export interface ImportSummary {
@@ -55,6 +56,7 @@ export function validateBackup(raw: unknown): BackupData {
     notes: arr('notes'),
     tags: arr('tags'),
     settings: arr('settings'),
-    rosters: arr('rosters')
+    rosters: arr('rosters'),
+    friendEdges: arr('friendEdges')
   }
 }
