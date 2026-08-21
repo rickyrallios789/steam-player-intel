@@ -16,20 +16,26 @@ import type {
 } from './types'
 import { issue } from './types'
 import type { ServerObservation } from '../../shared/types'
+import { extractMatchPlayerId, extractSearchPlayerId, type BmRelPlayer } from '../../shared/battleMetricsMatch'
 
 const BM_HOST = 'api.battlemetrics.com'
 const BASE = `https://${BM_HOST}`
 
 interface BmMatchResponse {
-  data?: Array<{ type: string; id: string }>
+  data?: Array<{ type: string; id: string; relationships?: BmRelPlayer }>
 }
 interface BmIncluded {
   type: string
   id: string
   attributes?: Record<string, unknown>
+  relationships?: BmRelPlayer
   meta?: Record<string, unknown>
 }
 interface BmPlayerResponse {
+  included?: BmIncluded[]
+}
+interface BmSearchResponse {
+  data?: Array<{ type: string; id: string }>
   included?: BmIncluded[]
 }
 
@@ -66,8 +72,23 @@ export class BattleMetricsProvider implements DataProvider {
     }
   }
 
-  /** Steam64 → BattleMetrics player id, via the authorized players/match endpoint. */
+  /**
+   * Steam64 → BattleMetrics player id. Tries two strategies, most-authoritative first:
+   *   1. POST /players/match  — the quick-match endpoint (needs a token with the right
+   *      access, e.g. RCON/organization scope). The player id is under
+   *      relationships.player.data.id (NOT data[0].id, which is the identifier's own id).
+   *   2. GET /players?filter[search]=<steam64>&include=identifier — the public search,
+   *      which some tokens can use where /players/match is denied. We ONLY accept a
+   *      result whose returned steamID identifier EXACTLY equals the queried id, so we
+   *      never guess or fabricate a match.
+   */
   private async matchPlayer(ctx: ProviderContext, token: string): Promise<string | null> {
+    return (
+      (await this.matchViaQuickMatch(ctx.steam64, token)) ?? (await this.matchViaSearch(ctx.steam64, token))
+    )
+  }
+
+  private async matchViaQuickMatch(steam64: string, token: string): Promise<string | null> {
     try {
       const res = await fetch(`${BASE}/players/match`, {
         method: 'POST',
@@ -77,20 +98,22 @@ export class BattleMetricsProvider implements DataProvider {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          data: [
-            {
-              type: 'identifier',
-              attributes: { type: 'steamID', identifier: ctx.steam64 }
-            }
-          ]
+          data: [{ type: 'identifier', attributes: { type: 'steamID', identifier: steam64 } }]
         })
       })
       if (!res.ok) return null
-      const body = (await res.json()) as BmMatchResponse
-      return body.data?.[0]?.id ?? null
+      return extractMatchPlayerId((await res.json()) as BmMatchResponse)
     } catch {
       return null
     }
+  }
+
+  private async matchViaSearch(steam64: string, token: string): Promise<string | null> {
+    const url = `${BASE}/players?filter[search]=${encodeURIComponent(steam64)}&include=identifier&page[size]=10`
+    const res = await this.authedGetJson<BmSearchResponse>(url, token)
+    if (!res.ok) return null
+    // Only trust an EXACT steamID identifier match — never a coincidental name hit.
+    return extractSearchPlayerId(res.data, steam64)
   }
 
   async getServerHistory(ctx: ProviderContext): Promise<Capability<ServerHistoryData>> {
@@ -108,7 +131,7 @@ export class BattleMetricsProvider implements DataProvider {
         issue: issue(
           this.name,
           'bm_unavailable',
-          'BattleMetrics returned no authorized match for this Steam ID. This can mean the player is not in BattleMetrics’ data, or your token lacks identifier-search access.'
+          'BattleMetrics did not return a match for this Steam ID with your token. BattleMetrics only resolves a Steam ID to a player for tokens that have the right access — typically RCON / admin access to a server the player has been on. Apps tied to specific servers (or with server-side access) can show this where a personal read-only token cannot. All Steam-sourced data above is unaffected.'
         )
       }
     }
